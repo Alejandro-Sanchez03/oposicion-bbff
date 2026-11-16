@@ -1,88 +1,145 @@
 // =====================================================================
 // Pantalla HOY — la principal. Solo lo que toca hoy.
+//
+// Arriba, una "portada" que cambia de color según el día:
+// naranja fuego = TURNO, verde monte = LIBRE. Dentro: la racha, el mínimo
+// diario y un gran botón para empezar lo siguiente sin pensar.
 // =====================================================================
-import { datos, guardar } from '../db.js';
+import { datos, guardar, nuevoId } from '../db.js';
 import { ajustes, cambiarAjustes } from '../ajustes.js';
-import { hoyISO, textoLargo, textoCorto } from '../fechas.js';
+import { hoyISO, textoCorto, sumarDias, deISO, diferenciaDias, DIAS, MESES } from '../fechas.js';
 import { tipoDia, capacidadDia } from '../turnos.js';
-import { tareasDelDia, semanaDe, NOMBRE_TIPO, moverTarea } from '../guia.js';
+import {
+  tareasDelDia, semanaDe, NOMBRE_TIPO, ICONO_TIPO, TIPOS_CON_NOTA, moverTarea, hoyNoPuedo,
+} from '../guia.js';
 import { ordenarTareasDelDia } from '../reparto.js';
 import {
   minutosDelDia, tareasHechasDelDia, cumplido, rachaActual,
   diaParaComodin, usarComodin, registrarSesion, comodinDisponible,
 } from '../racha.js';
 import { fraseDeHoy, fraseRacha } from '../frases.js';
-import { abrirTemporizador } from '../temporizador.js';
-import { esc, dialogo, pedirTexto, toast, confirmar } from '../ui.js';
+import { abrirTemporizador, temporizadorGuardado } from '../temporizador.js';
+import { calcularNota } from './progreso.js';
+import { exportar } from './ajustes.js';
+import { esc, dialogo, pedirTexto, toast, confirmar, celebrar } from '../ui.js';
+
+/** Dibujo del monte (crestas y pinos) que va al fondo de la portada. */
+const PAISAJE = `<svg class="hero-paisaje" viewBox="0 0 400 110" preserveAspectRatio="none" aria-hidden="true">
+  <path d="M0 110V62l38-22 30 16 46-34 40 30 34-18 42 28 50-36 44 30 36-14 40 20v48z" fill="currentColor" opacity=".16"/>
+  <path d="M0 110V84l46-16 40 14 52-24 48 22 46-12 58 20 52-18 58 14v26z" fill="currentColor" opacity=".24"/>
+  <g fill="currentColor" opacity=".32">
+    <path d="M30 110l9-26 9 26zM52 110l7-20 7 20zM300 110l9-28 9 28zM322 110l7-19 7 19zM344 110l6-15 6 15zM150 110l7-21 7 21z"/>
+  </g></svg>`;
+
+const ETIQUETA = {
+  turno: { txt: 'Día de turno', icono: '🚒' },
+  libre: { txt: 'Día libre', icono: '🌲' },
+  nada: { txt: 'Día sin definir', icono: '❔' },
+};
 
 export async function render(cont, app) {
   const hoy = hoyISO();
   const a = ajustes();
-  const tipo = tipoDia(hoy);
+  const tipo = tipoDia(hoy) || 'nada';
   const racha = rachaActual();
   const tareas = ordenarTareasDelDia(tareasDelDia(hoy));
   const semana = semanaDe(hoy);
   const frase = await fraseDeHoy();
-  // La racha se menciona en días alternos (si llevas al menos 2 días).
   const textoRacha = racha >= 2 && new Date().getDate() % 2 === 0 ? fraseRacha(racha) : '';
   const minHoy = minutosDelDia(hoy);
   const hechasHoy = tareasHechasDelDia(hoy);
   const ok = cumplido(hoy);
+  const progreso = Math.min(1, Math.max(minHoy / a.minimoMinutos, hechasHoy / a.minimoTareas));
   const diaComodin = diaParaComodin();
   const noCabe = semana && semana.avisos?.some((x) => x.startsWith('No cabe') || x.startsWith('Ni siquiera'));
   const pendientes = tareas.filter((t) => t.estado !== 'hecha' && t.tipo !== 'clase');
+  const siguiente = pendientes[0];
+  const f = deISO(hoy);
+  const diasExamen = a.fechaExamen ? diferenciaDias(hoy, a.fechaExamen) : null;
+  const copiaVieja = (datos.tareas.length || datos.sesiones.length) &&
+    diferenciaDias(a.ultimaCopia || a.fechaInicio || hoy, hoy) >= 7;
 
-  const etiquetaDia = tipo === 'turno' ? 'DÍA DE TURNO' : tipo === 'libre' ? 'DÍA LIBRE' : 'DÍA SIN DEFINIR';
+  // Anillo del mínimo diario
+  const R = 40, CIRC = 2 * Math.PI * R;
 
   cont.innerHTML = `
-    <header class="hoy-cabecera">
-      <div>
-        <div class="hoy-fecha">${textoLargo(hoy)}</div>
-        <div class="etiqueta-dia ${tipo || 'nada'}">${etiquetaDia}
-          <small>${tipo ? `· hasta ${capacidadDia(hoy)} min` : '· márcalo en Calendario'}</small></div>
+    <section class="hero hero-${tipo}">
+      ${PAISAJE}
+      <div class="hero-arriba">
+        <div>
+          <div class="hero-dia">${DIAS[f.getDay()]}</div>
+          <div class="hero-fecha">${f.getDate()} de ${MESES[f.getMonth()]}</div>
+        </div>
+        ${diasExamen != null && diasExamen >= 0 ? `<div class="hero-cuenta"><b>${diasExamen}</b><small>${diasExamen === 1 ? 'día' : 'días'} al examen</small></div>` : ''}
       </div>
-      <div class="racha" title="Días seguidos cumpliendo el mínimo">🔥<b>${racha}</b><small>días</small></div>
-    </header>
+      <div class="hero-etiqueta">${ETIQUETA[tipo].icono} ${ETIQUETA[tipo].txt}
+        <span>${tipo === 'nada' ? 'márcalo en Calendario' : `hasta ${capacidadDia(hoy)} min`}</span></div>
 
-    ${frase ? `<blockquote class="frase">«${esc(frase)}»${textoRacha ? `<span>${esc(textoRacha)}</span>` : ''}</blockquote>` : ''}
+      <div class="hero-centro">
+        <div class="anillo-racha ${ok ? 'cumplido' : ''}" title="Racha: días seguidos cumpliendo el mínimo">
+          <svg viewBox="0 0 100 100" aria-hidden="true">
+            <circle cx="50" cy="50" r="${R}" class="anillo-fondo"/>
+            <circle cx="50" cy="50" r="${R}" class="anillo-progreso" stroke-dasharray="${CIRC}" stroke-dashoffset="${CIRC * (1 - progreso)}"/>
+          </svg>
+          <div class="anillo-texto"><span class="llama ${racha ? 'viva' : ''}">🔥</span><b>${racha}</b><small>${racha === 1 ? 'día' : 'días'}</small></div>
+        </div>
+        <div class="hero-minimo">
+          <b>${ok ? '¡Mínimo cumplido!' : 'Mínimo de hoy'}</b>
+          <span>${ok ? 'Hoy ya cuenta para la racha.' : `${minHoy}/${a.minimoMinutos} min o ${hechasHoy}/${a.minimoTareas} tarea${a.minimoTareas > 1 ? 's' : ''}`}</span>
+          <span class="hero-comodin">🃏 Comodín ${comodinDisponible(hoy) ? 'disponible' : 'usado'}</span>
+        </div>
+      </div>
 
-    <button class="proximo" data-acc="proximo">
-      <span class="proximo-titulo">➜ LO PRÓXIMO</span>
-      <span class="proximo-texto">${a.proximo ? esc(a.proximo) : '<i>Aún nada. Se rellena al terminar una sesión.</i>'}</span>
+      ${siguiente
+        ? `<button class="cta" data-acc="empezar" data-uid="${siguiente.uid}">
+            <span class="cta-play">▶</span>
+            <span class="cta-texto"><b>EMPEZAR</b><small>${ICONO_TIPO[siguiente.tipo]} ${esc(siguiente.titulo)} · ${siguiente.minutos} min</small></span></button>`
+        : tareas.length
+          ? `<button class="cta hecho" data-acc="adelantar"><span class="cta-play">🎉</span>
+              <span class="cta-texto"><b>Todo hecho por hoy</b><small>¿Adelantas algo de mañana?</small></span></button>`
+          : `<button class="cta" data-acc="libre"><span class="cta-play">▶</span>
+              <span class="cta-texto"><b>ESTUDIO LIBRE</b><small>Hoy no hay tareas asignadas</small></span></button>`}
+
+      <div class="hero-acciones">
+        <button data-acc="diez">⚡ Solo 10 min</button>
+        ${pendientes.length ? '<button data-acc="no-puedo">🛌 Hoy no puedo</button>' : ''}
+        <button data-acc="manual">✏️ Apuntar minutos</button>
+      </div>
+    </section>
+
+    ${frase ? `<blockquote class="frase"><p>${esc(frase)}</p>${textoRacha ? `<span>${esc(textoRacha)}</span>` : ''}</blockquote>` : ''}
+
+    <button class="nota-proximo" data-acc="proximo">
+      <span class="nota-chincheta">📌</span>
+      <span class="nota-titulo">Lo próximo</span>
+      <span class="nota-texto">${a.proximo ? esc(a.proximo) : '<i>Al terminar una sesión, escribe aquí por dónde vas.</i>'}</span>
     </button>
 
     ${app.avisosHoy.length ? `<div class="aviso info">
-      ${app.avisosHoy.map((m) => `<p>🔁 ${esc(m)}</p>`).join('')}
+      <p><b>🔁 He recolocado tareas:</b></p>${app.avisosHoy.map((m) => `<p>${esc(m)}</p>`).join('')}
       <button class="boton pequeno" data-acc="cerrar-avisos">Entendido</button></div>` : ''}
 
     ${diaComodin ? `<div class="aviso">
-      <p>El ${textoCorto(diaComodin)} no llegaste al mínimo. ¿Usas el comodín de esa semana para no romper la racha?</p>
+      <p>El <b>${textoCorto(diaComodin)}</b> no llegaste al mínimo. ¿Usas el comodín de esa semana para salvar la racha?</p>
       <button class="boton pequeno primario" data-acc="comodin" data-fecha="${diaComodin}">🃏 Usar comodín</button></div>` : ''}
 
     ${noCabe ? `<div class="aviso peligro"><p>⚠ Esta semana no cabe todo.</p>
       <button class="boton pequeno" data-ir="semana">Ver la semana y el plan de mínimos</button></div>` : ''}
 
+    ${copiaVieja ? `<div class="aviso"><p>💾 Hace más de una semana que no guardas una copia de seguridad.</p>
+      <button class="boton pequeno" data-acc="copia">Guardar copia ahora</button></div>` : ''}
+
+    <h2 class="titulo-seccion">Tareas de hoy ${conteo(tareas)}</h2>
     <section class="lista-tareas">
-      ${!datos.semanas.length ? `<div class="vacio"><p>Aún no has cargado ninguna guía semanal.</p>
+      ${!datos.semanas.length ? `<div class="vacio"><div class="vacio-emoji">🗂️</div><p>Aún no has cargado ninguna guía semanal.</p>
           <button class="boton primario" data-ir="semana">Cargar la guía</button></div>`
-        : !tareas.length ? `<div class="vacio"><p>${semana ? 'Hoy no tienes tareas asignadas. 💤' : 'No hay guía cargada para esta semana.'}</p>
-          ${semana ? '' : '<button class="boton primario" data-ir="semana">Cargar la guía</button>'}</div>`
-        : tareas.map((t, i) => tarjetaTarea(t, i)).join('')}
+        : !tareas.length ? `<div class="vacio"><div class="vacio-emoji">${semana ? '😌' : '🗂️'}</div>
+          <p>${semana ? 'Hoy no tienes tareas. Si te apetece, «Solo 10 min» o adelanta algo.' : 'No hay guía cargada para esta semana.'}</p>
+          ${semana ? '<button class="boton" data-acc="adelantar">⏩ Adelantar una tarea</button>' : '<button class="boton primario" data-ir="semana">Cargar la guía</button>'}</div>`
+        : tareas.map((t) => tarjetaTarea(t, t === siguiente)).join('')}
     </section>
 
-    ${tareas.length && !pendientes.length && semana ? `<button class="boton ancho" data-acc="adelantar">⏩ Adelantar una tarea de los próximos días</button>` : ''}
-
-    <section class="minimo ${ok ? 'cumplido' : ''}">
-      <div class="minimo-texto">${ok ? '✓ Mínimo cumplido: hoy cuenta para la racha'
-        : `Mínimo de hoy: ${a.minimoMinutos} min o ${a.minimoTareas} tarea(s)`}</div>
-      <div class="barra"><div style="width:${Math.min(100, Math.max(minHoy / a.minimoMinutos, hechasHoy / a.minimoTareas) * 100)}%"></div></div>
-      <div class="minimo-datos">${minHoy} min estudiados · ${hechasHoy} tarea(s) hechas ·
-        comodín de la semana: ${comodinDisponible(hoy) ? 'disponible' : 'usado'}</div>
-      <div class="fila-botones">
-        <button class="boton" data-acc="libre">▶ Estudio libre</button>
-        <button class="boton" data-acc="manual">+ Apuntar minutos</button>
-      </div>
-    </section>`;
+    ${vistaManana(hoy)}`;
 
   // ---- Acciones ----
   cont.onclick = async (e) => {
@@ -93,67 +150,152 @@ export async function render(cont, app) {
 
     if (acc === 'empezar') abrirTemporizador(tarea, (min) => cerrarSesion(min, tarea, app));
     if (acc === 'libre') abrirTemporizador(null, (min) => cerrarSesion(min, null, app));
-    if (acc === 'hecha') {
-      const hecha = tarea.estado !== 'hecha';
-      await guardar('tareas', { ...tarea, estado: hecha ? 'hecha' : 'pendiente', hechaEn: hecha ? hoy : null });
-      if (hecha) toast('¡Hecha! 💪');
-      app.refrescar();
+    if (acc === 'diez') {
+      // La tarea ligera más corta pendiente de hoy (o estudio libre)
+      const ligera = pendientes.filter((t) => t.tipo !== 'estudio').sort((x, y) => x.minutos - y.minutos)[0];
+      abrirTemporizador(ligera || null, (min) => cerrarSesion(min, ligera || null, app),
+        { minutos: 10, titulo: ligera ? `10 min · ${ligera.titulo}` : '10 minutos. Solo eso.' });
     }
+    if (acc === 'hecha') await marcarHecha(tarea, b, app);
     if (acc === 'proximo') {
       const txt = await pedirTexto('¿Por dónde vas? / ¿Qué toca la próxima vez?', { valor: a.proximo });
       if (txt !== null) { await cambiarAjustes({ proximo: txt, proximoFecha: hoy }); app.refrescar(); }
     }
     if (acc === 'cerrar-avisos') { app.avisosHoy = []; app.refrescar(); }
-    if (acc === 'comodin') { await usarComodin(b.dataset.fecha); toast('Comodín usado. La racha sigue viva.'); app.refrescar(); }
+    if (acc === 'comodin') { await usarComodin(b.dataset.fecha); celebrar(b); toast('Comodín usado. La racha sigue viva 🔥'); app.refrescar(); }
     if (acc === 'manual') {
       const min = await pedirTexto('¿Cuántos minutos has estudiado sin temporizador?', { tipo: 'number', placeholder: '20' });
       if (min && Number(min) > 0) {
+        const antes = cumplido(hoy);
         await registrarSesion({ minutos: Number(min) });
+        if (!antes && cumplido(hoy)) celebrar();
         await pedirProximo(app);
       }
     }
+    if (acc === 'no-puedo') {
+      if (!(await confirmar(`Paso tus ${pendientes.length} tarea(s) de hoy a los próximos días de la semana.<br><br>
+        Sin culpa: a veces el turno no da para más. Si mañana ves que no llegaste al mínimo, tienes el comodín.`, 'Pasarlas', 'Mejor no'))) return;
+      app.avisosHoy = await hoyNoPuedo();
+      app.refrescar();
+    }
     if (acc === 'adelantar') await adelantar(app);
+    if (acc === 'copia') { await exportar(); app.refrescar(); }
   };
 }
 
-function tarjetaTarea(t, i) {
+/** "2/3 hechas" (sin contar la clase). */
+function conteo(tareas) {
+  const t = tareas.filter((x) => x.tipo !== 'clase');
+  return t.length ? `<small>${t.filter((x) => x.estado === 'hecha').length}/${t.length} hechas</small>` : '';
+}
+
+function tarjetaTarea(t, esSiguiente) {
   const hecha = t.estado === 'hecha';
   if (t.tipo === 'clase') {
-    return `<article class="tarea clase"><div class="tarea-titulo">🎓 ${esc(t.titulo)}</div>
-      <div class="tarea-datos">Clase · 17:00–20:00</div></article>`;
+    return `<article class="tarea tipo-clase"><div class="tarea-icono">${ICONO_TIPO.clase}</div>
+      <div class="tarea-cuerpo"><div class="tarea-titulo">${esc(t.titulo)}</div>
+      <div class="tarea-datos">Clase · 17:00–20:00</div></div></article>`;
   }
-  return `<article class="tarea ${hecha ? 'hecha' : ''}">
-    <div class="tarea-num">${i + 1}</div>
+  return `<article class="tarea tipo-${t.tipo} ${hecha ? 'hecha' : ''} ${esSiguiente ? 'siguiente' : ''}">
+    <div class="tarea-icono">${ICONO_TIPO[t.tipo]}</div>
     <div class="tarea-cuerpo">
+      ${esSiguiente ? '<div class="tarea-sigue">Lo siguiente</div>' : ''}
       <div class="tarea-titulo">${esc(t.titulo)}</div>
-      <div class="tarea-datos">${esc(t.tema)}${NOMBRE_TIPO[t.tipo] !== t.tema ? ` · ${NOMBRE_TIPO[t.tipo]}` : ''} · ${t.minutos} min
-        ${t.minutosDedicados ? ` · llevas ${t.minutosDedicados} min` : ''}
-        ${t.minimo ? ' · <span class="chip">mínimos</span>' : ''}
-        ${!t.obligatoria ? ' · <span class="chip">opcional</span>' : ''}
-        ${t.recolocadaDesde ? ` · <span class="chip">viene del ${textoCorto(t.recolocadaDesde)}</span>` : ''}</div>
-      <div class="fila-botones">
-        ${hecha ? '' : `<button class="boton grande primario" data-acc="empezar" data-uid="${t.uid}">▶ EMPEZAR</button>`}
-        <button class="boton grande ${hecha ? '' : 'secundario'}" data-acc="hecha" data-uid="${t.uid}">${hecha ? '↩ Desmarcar' : '✓ Hecha'}</button>
+      <div class="tarea-datos">
+        <span>${esc(t.tema)}${NOMBRE_TIPO[t.tipo] !== t.tema ? ` · ${NOMBRE_TIPO[t.tipo]}` : ''}</span>
+        <span>⏱ ${t.minutos} min${t.minutosDedicados ? ` (llevas ${t.minutosDedicados})` : ''}</span>
+        ${t.minimo ? '<span class="chip">mínimos</span>' : ''}
+        ${!t.obligatoria ? '<span class="chip">opcional</span>' : ''}
+        ${t.recolocadaDesde ? `<span class="chip">viene del ${textoCorto(t.recolocadaDesde)}</span>` : ''}
       </div>
+    </div>
+    <div class="tarea-botones">
+      ${hecha ? '' : `<button class="boton-play" data-acc="empezar" data-uid="${t.uid}" aria-label="Empezar">▶</button>`}
+      <button class="boton-check" data-acc="hecha" data-uid="${t.uid}" aria-label="${hecha ? 'Desmarcar' : 'Marcar como hecha'}">✓</button>
     </div></article>`;
+}
+
+/** Vista previa de mañana, para saber lo que viene. */
+function vistaManana(hoy) {
+  const manana = sumarDias(hoy, 1);
+  const tipo = tipoDia(manana);
+  const t = tareasDelDia(manana).filter((x) => x.tipo !== 'clase');
+  const min = t.reduce((s, x) => s + x.minutos, 0);
+  return `<section class="manana">
+    <div class="manana-cab"><b>Mañana</b>
+      <span class="etiqueta-dia mini ${tipo || 'nada'}">${tipo ? tipo.toUpperCase() : 'SIN DEFINIR'}</span>
+      <span>${t.length ? `${t.length} tarea(s) · ${min} min` : 'sin tareas'}</span></div>
+    ${t.length ? `<div class="manana-lista">${t.map((x) => `<span>${ICONO_TIPO[x.tipo]} ${esc(x.titulo)}</span>`).join('')}</div>` : ''}
+  </section>`;
+}
+
+/** Marca/desmarca una tarea. Con "Deshacer" y, si es un test, ofrece apuntar la nota. */
+async function marcarHecha(tarea, boton, app) {
+  const hoy = hoyISO();
+  const hecha = tarea.estado !== 'hecha';
+  const antes = cumplido(hoy);
+  await guardar('tareas', { ...tarea, estado: hecha ? 'hecha' : 'pendiente', hechaEn: hecha ? hoy : null });
+  if (!hecha) { app.refrescar(); return; }
+  celebrar(boton);
+  if (!antes && cumplido(hoy)) setTimeout(() => celebrar(), 350);
+  if (TIPOS_CON_NOTA.includes(tarea.tipo)) await pedirNota(tarea);
+  app.refrescar();
+  toast('¡Hecha! 💪', {
+    boton: 'Deshacer',
+    alPulsar: async () => { await guardar('tareas', tarea); app.refrescar(); },
+  });
+}
+
+/** Al terminar un test: apuntar la nota en el momento. */
+async function pedirNota(tarea) {
+  const r = await dialogo(`
+    <h3>✍️ ¿Qué tal el test?</h3>
+    <p class="ayuda">${esc(tarea.titulo)} · se guardará en Progreso → Tests</p>
+    <div class="tres-columnas">
+      <label class="campo"><span>Aciertos</span><input type="number" name="ac" min="0" inputmode="numeric"></label>
+      <label class="campo"><span>Fallos</span><input type="number" name="fa" min="0" inputmode="numeric" value="0"></label>
+      <label class="campo"><span>En blanco</span><input type="number" name="bl" min="0" inputmode="numeric" value="0"></label>
+    </div>`,
+  [{ texto: 'Ahora no', valor: false }, { texto: 'Guardar nota', valor: true, clase: 'primario' }],
+  (form, ok) => (ok && form.ac.value !== '' ? { ac: Number(form.ac.value), fa: Number(form.fa.value) || 0, bl: Number(form.bl.value) || 0 } : null));
+  if (!r) return;
+  const nota = calcularNota(r.ac, r.fa, r.bl);
+  await guardar('tests', {
+    id: nuevoId(), fecha: hoyISO(), tema: tarea.tema, aciertos: r.ac, fallos: r.fa, blanco: r.bl,
+    nota, creado: new Date().toISOString(), tareaUid: tarea.uid,
+  });
+  toast(`Nota guardada: ${nota.toFixed(2)}`);
 }
 
 /** Al terminar el temporizador: guarda el tiempo y pregunta por dónde vas. */
 async function cerrarSesion(minutos, tarea, app) {
+  const hoy = hoyISO();
+  const antes = cumplido(hoy);
   await registrarSesion({ minutos, tareaUid: tarea?.uid });
+  if (!antes && cumplido(hoy)) celebrar();
   const res = await dialogo(`
-      <h3>Sesión terminada: ${minutos} min</h3>
-      ${tarea ? `<label class="check"><input type="checkbox" name="hecha"> He terminado «${esc(tarea.titulo)}»</label>` : ''}
+      <div class="sesion-fin"><b>${minutos}</b><span>min estudiados</span></div>
+      ${tarea && tarea.estado !== 'hecha' ? `<label class="check"><input type="checkbox" name="hecha"> He terminado «${esc(tarea.titulo)}»</label>` : ''}
       <label class="campo"><span>¿Por dónde vas? / ¿Qué toca la próxima vez?</span>
         <input name="proximo" placeholder="Ej: Seguir por el art. 19 del Reglamento" value="${esc(ajustes().proximo)}"></label>`,
     [{ texto: 'Guardar', valor: true, clase: 'primario' }],
     (form) => ({ hecha: form.hecha?.checked, proximo: form.proximo.value.trim() }));
+  if (res && res.proximo) await cambiarAjustes({ proximo: res.proximo, proximoFecha: hoy });
   if (res && tarea && res.hecha) {
     const t = datos.tareas.find((x) => x.uid === tarea.uid);
-    await guardar('tareas', { ...t, estado: 'hecha', hechaEn: hoyISO() });
+    await guardar('tareas', { ...t, estado: 'hecha', hechaEn: hoy });
+    celebrar();
+    if (TIPOS_CON_NOTA.includes(t.tipo)) await pedirNota(t);
   }
-  if (res && res.proximo) await cambiarAjustes({ proximo: res.proximo, proximoFecha: hoyISO() });
   app.refrescar();
+}
+
+/** Si la app se cerró con el temporizador en marcha, lo recupera. */
+export function reanudarTemporizador(app) {
+  const estado = temporizadorGuardado();
+  if (!estado) return;
+  const tarea = datos.tareas.find((t) => t.uid === estado.tareaUid) || null;
+  abrirTemporizador(tarea, (min) => cerrarSesion(min, tarea, app), { estado });
 }
 
 async function pedirProximo(app) {
@@ -166,13 +308,13 @@ async function pedirProximo(app) {
 async function adelantar(app) {
   const hoy = hoyISO();
   const semana = semanaDe(hoy);
-  const siguiente = ordenarTareasDelDia(datos.tareas.filter((t) => t.semanaId === semana.id &&
-    t.estado !== 'hecha' && t.tipo !== 'clase' && t.dia_asignado && t.dia_asignado > hoy))
-    .sort((x, y) => x.dia_asignado.localeCompare(y.dia_asignado))[0];
-  if (!siguiente) { toast('No quedan tareas pendientes esta semana. 🎉'); return; }
+  if (!semana) return;
+  const siguiente = datos.tareas.filter((t) => t.semanaId === semana.id &&
+    t.estado !== 'hecha' && t.tipo !== 'clase' && t.dia_asignado && t.dia_asignado > hoy)
+    .sort((x, y) => x.dia_asignado.localeCompare(y.dia_asignado) || x.orden - y.orden)[0];
+  if (!siguiente) { toast('No quedan tareas pendientes esta semana 🎉'); return; }
   if (await confirmar(`¿Traer a hoy «${esc(siguiente.titulo)}» (${siguiente.minutos} min, estaba el ${textoCorto(siguiente.dia_asignado)})?`, 'Traer a hoy')) {
     await moverTarea(siguiente.uid, hoy);
     app.refrescar();
   }
 }
-

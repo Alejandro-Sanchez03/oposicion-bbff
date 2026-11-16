@@ -22,6 +22,9 @@ export const AJUSTES_POR_DEFECTO = {
   fraseHoy: null,          // { fecha, indice }
   fechaInicio: null,       // primer día que usaste la app (la racha empieza aquí)
   ultimaRevision: null,    // último día en que se recolocaron tareas atrasadas
+  fechaExamen: null,       // para la cuenta atrás ("Faltan X días")
+  ultimaCopia: null,       // última copia de seguridad exportada (para recordártelo)
+  bienvenidaHecha: false,  // ¿ya se mostró el asistente de la primera vez?
   notificaciones: { activas: false, hora: '07:30', dias: 'todos' }, // fase 4
 };
 

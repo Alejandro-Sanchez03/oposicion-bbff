@@ -34,13 +34,18 @@ Repite en el móvil si quieres tenerla también allí.
 
 ## 3. Primeros pasos dentro de la app
 
-1. **Calendario → Definir patrón**: pon el primer día de turno del ciclo y cuántos días de turno
-   y libres tienes. Luego toca los días sueltos que no encajen para cambiarlos (TURNO ↔ LIBRE).
-2. **Semana → Cargar guía (JSON)**: pega el JSON que te genera la IA. Si tiene errores te dirá cuáles.
-   Pulsa **Ver ejemplo** para ver cómo debe ser.
-3. **Hoy**: abre la app cada día y haz lo que pone. Pulsa **▶ EMPEZAR** y, al terminar,
-   escribe por dónde vas.
-4. **Ajustes**: cambia los minutos por día, el pomodoro y el mínimo diario a tu gusto.
+1. La primera vez se abre un **asistente** de 4 pasos: fecha del examen (opcional), tu ciclo de turnos
+   y cuántos minutos puedes dedicar. Luego podrás corregir días sueltos en **Calendario** tocándolos.
+2. **Cada semana, con la guía de la academia:**
+   1. En **Semana**, pulsa **«1 · Copiar instrucciones»**.
+   2. Abre la otra IA, **pega** las instrucciones y **adjunta el PDF** de la academia.
+   3. Copia el JSON que te devuelva.
+   4. Vuelve a la app: **«2 · Cargar la guía» → 📋 Pegar → Importar**. Si tiene errores, te dirá cuáles.
+3. **Cada día:** abre la app y pulsa el gran botón **▶ EMPEZAR**. Ya está.
+   - Si vas reventado: **⚡ Solo 10 min**.
+   - Si hoy es imposible: **🛌 Hoy no puedo** (pasa las tareas a otros días).
+   - Al terminar, escribe por dónde vas: lo verás en la nota amarilla «Lo próximo».
+   - Al marcar un test como hecho, te pide la nota y la guarda en Progreso.
 
 ## 4. Copias de seguridad
 

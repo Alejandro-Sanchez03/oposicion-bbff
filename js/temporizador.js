@@ -1,12 +1,15 @@
 // =====================================================================
 // temporizador.js — Temporizador tipo pomodoro a pantalla completa.
 // Estudio (25 min) → descanso (5 min) → estudio... (configurable en Ajustes).
-// Usa la hora real del reloj, así que aunque la pantalla se apague
-// el tiempo sigue contando bien.
+//
+// - Usa la hora real del reloj: aunque la pantalla se apague, cuenta bien.
+// - Se guarda en el dispositivo: si la app se cierra o se recarga, al
+//   volver a abrirla el temporizador sigue donde estaba.
 // =====================================================================
 import { ajustes } from './ajustes.js';
 import { esc } from './ui.js';
 
+const CLAVE = 'temporizador-en-curso';
 let wakeLock = null;
 
 /** Pitido corto + vibración al cambiar de fase. */
@@ -29,27 +32,40 @@ function avisoSonoro() {
 
 const mmss = (seg) => `${String(Math.floor(seg / 60)).padStart(2, '0')}:${String(Math.floor(seg % 60)).padStart(2, '0')}`;
 
+/** ¿Había un temporizador en marcha al cerrar la app? Devuelve su estado o null. */
+export function temporizadorGuardado() {
+  try {
+    const e = JSON.parse(localStorage.getItem(CLAVE));
+    // Si tiene más de 12 horas, se descarta.
+    return e && Date.now() - e.creado < 12 * 3600 * 1000 ? e : null;
+  } catch { return null; }
+}
+
 /**
  * Abre el temporizador.
  * @param {object|null} tarea  Tarea en la que vas a trabajar (o null = estudio libre).
  * @param {function} alTerminar  Recibe los minutos estudiados al pulsar "Terminar".
+ * @param {object} [op]  { minutos: duración del bloque de estudio, titulo, estado: estado guardado }
  */
-export function abrirTemporizador(tarea, alTerminar) {
+export function abrirTemporizador(tarea, alTerminar, op = {}) {
   const a = ajustes();
-  const DUR = { estudio: a.pomodoroEstudio * 60, descanso: a.pomodoroDescanso * 60 };
-
-  const estado = {
+  const estado = op.estado || {
+    tareaUid: tarea?.uid || null,
+    titulo: op.titulo || (tarea ? tarea.titulo : 'Estudio libre'),
+    dur: { estudio: (op.minutos || a.pomodoroEstudio) * 60, descanso: a.pomodoroDescanso * 60 },
     fase: 'estudio',          // 'estudio' o 'descanso'
     enMarcha: true,
-    finEn: Date.now() + DUR.estudio * 1000,  // momento en que acaba la fase
+    finEn: Date.now() + (op.minutos || a.pomodoroEstudio) * 60 * 1000, // momento en que acaba la fase
     restantePausa: null,      // segundos que quedaban al pausar
     estudiado: 0,             // segundos de estudio ya acumulados
     inicioTramo: Date.now(),  // desde cuándo se está contando estudio
     bloques: 0,
+    creado: Date.now(),
   };
+  const DUR = estado.dur;
+  const guardarEstado = () => { try { localStorage.setItem(CLAVE, JSON.stringify(estado)); } catch { /* sin espacio */ } };
 
   const capa = document.createElement('div');
-  capa.className = 'temporizador';
   document.body.appendChild(capa);
   if (navigator.wakeLock) navigator.wakeLock.request('screen').then((w) => { wakeLock = w; }).catch(() => {});
 
@@ -57,7 +73,8 @@ export function abrirTemporizador(tarea, alTerminar) {
 
   /** Suma al contador el tramo de estudio en curso. */
   function cerrarTramo() {
-    if (estado.fase === 'estudio' && estado.enMarcha) estado.estudiado += (Date.now() - estado.inicioTramo) / 1000;
+    // (Nunca se cuenta más allá del final del bloque, por si la app estuvo cerrada.)
+    if (estado.fase === 'estudio' && estado.enMarcha) estado.estudiado += Math.max(0, Math.min(Date.now(), estado.finEn) - estado.inicioTramo) / 1000;
     estado.inicioTramo = Date.now();
   }
 
@@ -69,22 +86,46 @@ export function abrirTemporizador(tarea, alTerminar) {
     estado.finEn = Date.now() + DUR[nueva] * 1000;
     estado.restantePausa = DUR[nueva];
     estado.inicioTramo = Date.now();
+    guardarEstado();
     pintar();
   }
 
+  const R = 120;
+  const CIRC = 2 * Math.PI * R;
+
   function pintar() {
-    const totalMin = Math.floor((estado.estudiado + (estado.fase === 'estudio' && estado.enMarcha ? (Date.now() - estado.inicioTramo) / 1000 : 0)) / 60);
-    capa.className = `temporizador fase-${estado.fase}`;
+    capa.className = `temporizador fase-${estado.fase} ${estado.enMarcha ? '' : 'en-pausa'}`;
     capa.innerHTML = `
-      <div class="temp-tarea">${tarea ? esc(tarea.titulo) : 'Estudio libre'}</div>
-      <div class="temp-fase">${estado.fase === 'estudio' ? '📖 ESTUDIO' : '☕ DESCANSO'}</div>
-      <div class="temp-reloj" aria-live="polite">${mmss(restante())}</div>
-      <div class="temp-info">Llevas ${totalMin} min de estudio · ${estado.bloques} bloque(s)</div>
+      <div class="temp-brillo"></div>
+      <div class="temp-tarea">${esc(estado.titulo)}</div>
+      <div class="temp-fase">${estado.fase === 'estudio' ? 'Estudio' : 'Descanso'}${estado.enMarcha ? '' : ' · en pausa'}</div>
+      <div class="temp-anillo">
+        <svg viewBox="0 0 280 280" aria-hidden="true">
+          <circle cx="140" cy="140" r="${R}" class="anillo-fondo"/>
+          <circle cx="140" cy="140" r="${R}" class="anillo-progreso" stroke-dasharray="${CIRC}" stroke-dashoffset="0"/>
+        </svg>
+        <div class="temp-reloj" aria-live="polite">${mmss(restante())}</div>
+      </div>
+      <div class="temp-info"></div>
       <div class="temp-botones">
-        <button class="boton grande" data-acc="pausa">${estado.enMarcha ? '⏸ Pausa' : '▶ Seguir'}</button>
-        <button class="boton grande" data-acc="fase">${estado.fase === 'estudio' ? '☕ Descanso ya' : '📖 Volver a estudiar'}</button>
-        <button class="boton grande primario" data-acc="fin">■ Terminar sesión</button>
+        <button class="boton-redondo" data-acc="pausa" aria-label="${estado.enMarcha ? 'Pausa' : 'Seguir'}">
+          ${estado.enMarcha ? '❚❚' : '▶'}<small>${estado.enMarcha ? 'Pausa' : 'Seguir'}</small></button>
+        <button class="boton-redondo" data-acc="fase">
+          ${estado.fase === 'estudio' ? '☕' : '📖'}<small>${estado.fase === 'estudio' ? 'Descanso' : 'Estudiar'}</small></button>
+        <button class="boton-redondo principal" data-acc="fin">■<small>Terminar</small></button>
       </div>`;
+    actualizar();
+  }
+
+  /** Actualiza solo lo que cambia cada segundo (reloj, anillo, minutos). */
+  function actualizar() {
+    const r = restante();
+    const reloj = capa.querySelector('.temp-reloj');
+    if (!reloj) return;
+    reloj.textContent = mmss(r);
+    capa.querySelector('.anillo-progreso').setAttribute('stroke-dashoffset', String(CIRC * (1 - r / DUR[estado.fase])));
+    const total = estado.estudiado + (estado.fase === 'estudio' && estado.enMarcha ? (Date.now() - estado.inicioTramo) / 1000 : 0);
+    capa.querySelector('.temp-info').textContent = `${Math.floor(total / 60)} min estudiados · ${estado.bloques} bloque(s)`;
   }
 
   capa.addEventListener('click', (e) => {
@@ -92,12 +133,14 @@ export function abrirTemporizador(tarea, alTerminar) {
     if (acc === 'pausa') {
       if (estado.enMarcha) { cerrarTramo(); estado.restantePausa = restante(); estado.enMarcha = false; }
       else { estado.finEn = Date.now() + estado.restantePausa * 1000; estado.enMarcha = true; estado.inicioTramo = Date.now(); }
+      guardarEstado();
       pintar();
     } else if (acc === 'fase') {
       cambiarFase(estado.fase === 'estudio' ? 'descanso' : 'estudio', true);
     } else if (acc === 'fin') {
       cerrarTramo();
       clearInterval(reloj);
+      localStorage.removeItem(CLAVE);
       if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
       capa.remove();
       alTerminar(Math.round(estado.estudiado / 60));
@@ -111,10 +154,10 @@ export function abrirTemporizador(tarea, alTerminar) {
       // Tras estudiar → descanso automático. Tras descansar → espera a que pulses "Seguir".
       cambiarFase(estado.fase === 'estudio' ? 'descanso' : 'estudio', estado.fase === 'estudio');
     } else {
-      const r = capa.querySelector('.temp-reloj');
-      if (r) r.textContent = mmss(restante());
+      actualizar();
     }
   }, 500);
 
+  guardarEstado();
   pintar();
 }

@@ -9,13 +9,14 @@ import { recolocarAtrasadas } from './guia.js';
 import { cargarFrases } from './frases.js';
 import { hoyISO } from './fechas.js';
 import * as hoy from './pantallas/hoy.js';
+import { hayQueMostrarBienvenida, mostrarBienvenida } from './bienvenida.js';
 import * as semana from './pantallas/semana.js';
 import * as calendario from './pantallas/calendario.js';
 import * as progreso from './pantallas/progreso.js';
 import * as pantallaAjustes from './pantallas/ajustes.js';
 
 // Cambia este número cada vez que publiques una versión nueva (y también en sw.js).
-window.VERSION_APP = '1.0.0';
+window.VERSION_APP = '1.1.0';
 
 const PANTALLAS = { hoy, semana, calendario, progreso, ajustes: pantallaAjustes };
 
@@ -50,7 +51,9 @@ async function arrancar() {
   aplicarTema();
   await cargarFrases();
   await revisionDiaria();
+  if (hayQueMostrarBienvenida()) await mostrarBienvenida();
   await refrescar();
+  hoy.reanudarTemporizador(app); // si se cerró la app con el temporizador en marcha
 
   window.addEventListener('hashchange', () => { window.scrollTo(0, 0); refrescar(); });
   // Enlaces internos con data-ir="semana" etc.

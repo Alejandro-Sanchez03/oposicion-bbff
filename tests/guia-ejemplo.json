@@ -1,0 +1,15 @@
+{
+  "semana": "2026-11-13 a 2026-11-19",
+  "fecha_limite": "2026-11-19T17:00",
+  "prioridad": ["PEIF", "Reglamento SBF", "Psicotécnico"],
+  "plan_minimo": "Si vas agobiado, céntrate solo en el Documento IV y el Anexo 2",
+  "tareas": [
+    {"id": "t1", "titulo": "Estudiar apartado 4 PEIF", "tema": "PEIF", "tipo": "estudio", "obligatoria": true, "dia_sugerido": "2026-11-13", "minutos": 120, "minimo": false},
+    {"id": "t2", "titulo": "Test apartado 4", "tema": "PEIF", "tipo": "test", "obligatoria": true, "dia_sugerido": "2026-11-14", "minutos": 30, "minimo": true},
+    {"id": "t3", "titulo": "Repaso Anexo 2", "tema": "PEIF", "tipo": "repaso", "obligatoria": true, "dia_sugerido": "2026-11-16", "minutos": 20, "minimo": true},
+    {"id": "t4", "titulo": "Estudiar arts. 1-20 Reglamento", "tema": "Reglamento SBF", "tipo": "estudio", "obligatoria": true, "dia_sugerido": "2026-11-17", "minutos": 120, "minimo": false},
+    {"id": "t5", "titulo": "Autoevaluación Reglamento", "tema": "Reglamento SBF", "tipo": "autoevaluacion", "obligatoria": true, "dia_sugerido": "2026-11-18", "minutos": 20, "minimo": false},
+    {"id": "t6", "titulo": "Aptitud numérica 02", "tema": "Psicotécnico", "tipo": "psicotecnico", "obligatoria": false, "dia_sugerido": "2026-11-16", "minutos": 45, "minimo": false},
+    {"id": "t7", "titulo": "Clase semanal", "tema": "Academia", "tipo": "clase", "obligatoria": true, "dia_sugerido": "2026-11-19", "minutos": 0, "minimo": false}
+  ]
+}

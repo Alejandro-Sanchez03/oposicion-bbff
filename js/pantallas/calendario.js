@@ -38,6 +38,7 @@ export function render(cont, app) {
 
   const p = ajustes().patron;
   cont.innerHTML = `
+    <p class="antetitulo">Turnos y racha</p>
     <h1>Calendario</h1>
     <section class="tarjeta racha-resumen">
       <div><b>🔥 ${rachaActual()}</b><small>racha actual</small></div>

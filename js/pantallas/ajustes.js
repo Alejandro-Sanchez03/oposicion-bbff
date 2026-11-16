@@ -21,6 +21,7 @@ const NUMEROS = [
 export function render(cont, app) {
   const a = ajustes();
   cont.innerHTML = `
+    <p class="antetitulo">A tu medida</p>
     <h1>Ajustes</h1>
     <form class="tarjeta" id="form-ajustes">
       <h3>Tiempos</h3>
@@ -29,6 +30,14 @@ export function render(cont, app) {
       <p class="ayuda">El mínimo diario se cumple con los minutos <b>o</b> con las tareas, lo que llegue antes.</p>
       <button class="boton primario ancho">Guardar</button>
     </form>
+
+    <section class="tarjeta">
+      <h3>Fecha del examen</h3>
+      <p class="ayuda">Para la cuenta atrás de la pantalla HOY. Déjala vacía si aún no se sabe.</p>
+      <div class="fila-botones">
+        <input type="date" id="fecha-examen" value="${a.fechaExamen || ''}">
+      </div>
+    </section>
 
     <section class="tarjeta">
       <h3>Aspecto</h3>
@@ -45,6 +54,7 @@ export function render(cont, app) {
 
     <section class="tarjeta">
       <h3>Copia de seguridad</h3>
+      <p>${a.ultimaCopia ? `Última copia: <b>${a.ultimaCopia}</b>` : '<b>Aún no has hecho ninguna copia.</b>'}</p>
       <p class="ayuda">Tus datos solo están en este dispositivo. Haz una copia de vez en cuando
         (y siempre antes de cambiar de móvil o borrar datos del navegador).</p>
       <div class="fila-botones">
@@ -56,6 +66,11 @@ export function render(cont, app) {
     <p class="ayuda centrado">Oposición BF · versión <span id="version-app"></span></p>`;
 
   cont.querySelector('#version-app').textContent = window.VERSION_APP || '';
+
+  cont.querySelector('#fecha-examen').addEventListener('change', async (e) => {
+    await cambiarAjustes({ fechaExamen: e.target.value || null });
+    toast('Fecha del examen guardada');
+  });
 
   cont.querySelector('#form-ajustes').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -76,7 +91,7 @@ export function render(cont, app) {
     const b = e.target.closest('[data-tema], [data-acc]');
     if (!b) return;
     if (b.dataset.tema) { await cambiarAjustes({ tema: b.dataset.tema }); aplicarTema(); app.refrescar(); }
-    if (b.dataset.acc === 'exportar') exportar();
+    if (b.dataset.acc === 'exportar') { await exportar(); app.refrescar(); }
     if (b.dataset.acc === 'borrar') {
       if (await confirmar('Se borrará TODO (turnos, guías, racha, tests, temario). ¿Has hecho una copia?', 'Borrar todo') &&
           await confirmar('¿Seguro de verdad? No se puede deshacer.', 'Sí, borrar')) {
@@ -101,7 +116,8 @@ export function render(cont, app) {
   });
 }
 
-function exportar() {
+/** Descarga la copia de seguridad (también se usa desde la pantalla HOY). */
+export async function exportar() {
   const blob = new Blob([JSON.stringify(exportarTodo(), null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -111,5 +127,6 @@ function exportar() {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
+  await cambiarAjustes({ ultimaCopia: hoyISO() });
   toast('Copia descargada (mírala en Descargas)');
 }

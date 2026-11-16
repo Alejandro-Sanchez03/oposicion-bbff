@@ -12,6 +12,12 @@ export const NOMBRE_TIPO = {
   estudio: 'Estudio', test: 'Test', autoevaluacion: 'Autoevaluación',
   repaso: 'Repaso', psicotecnico: 'Psicotécnico', clase: 'Clase',
 };
+/** Icono de cada tipo de tarea (el color está en estilos.css: .tipo-estudio, etc.). */
+export const ICONO_TIPO = {
+  estudio: '📖', test: '✍️', autoevaluacion: '🎯', repaso: '🔁', psicotecnico: '🧩', clase: '🎓',
+};
+/** Tipos que dan una nota (al marcarlos como hechos se ofrece apuntarla). */
+export const TIPOS_CON_NOTA = ['test', 'autoevaluacion', 'psicotecnico'];
 
 /** Convierte la posición de un error de JSON en "línea X, columna Y". */
 function lineaDeError(texto, mensaje) {
@@ -29,6 +35,8 @@ function lineaDeError(texto, mensaje) {
  */
 export function validarGuia(texto) {
   let g;
+  // Si la IA envolvió el JSON en ```json ... ```, se quita.
+  texto = texto.trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim();
   try {
     g = JSON.parse(texto);
   } catch (e) {
@@ -139,8 +147,8 @@ export async function importarGuia(guia) {
 }
 
 /** Días disponibles de una semana: desde hoy (o su inicio) hasta la fecha límite. */
-export function diasDisponibles(semana) {
-  const desde = semana.inicio > hoyISO() ? semana.inicio : hoyISO();
+export function diasDisponibles(semana, primerDia = hoyISO()) {
+  const desde = semana.inicio > primerDia ? semana.inicio : primerDia;
   if (desde > semana.fin) return [];
   return rangoFechas(desde, semana.fin).map((fecha) => ({
     fecha, tipo: tipoDia(fecha) || 'turno', capacidad: capacidadDia(fecha),
@@ -150,12 +158,13 @@ export function diasDisponibles(semana) {
 /**
  * Vuelve a repartir una semana.
  * @param {string[]} [soloEstas] uids que se deben mover (el resto se queda quieto).
+ * @param {string} [primerDia] primer día que se puede usar (por defecto, hoy).
  */
-export async function repartirSemana(semanaId, soloEstas = null) {
+export async function repartirSemana(semanaId, soloEstas = null, primerDia = hoyISO()) {
   const semana = datos.semanas.find((s) => s.id === semanaId);
   const tareas = datos.tareas.filter((t) => t.semanaId === semanaId);
   const resultado = repartir({
-    tareas, dias: diasDisponibles(semana), prioridad: semana.prioridad,
+    tareas, dias: diasDisponibles(semana, primerDia), prioridad: semana.prioridad,
     modoMinimos: semana.modoMinimos, soloEstas,
   });
   const cambiadas = [];
@@ -196,6 +205,62 @@ export async function recolocarAtrasadas() {
     }
   }
   return mensajes;
+}
+
+/**
+ * Botón "Hoy no puedo": las tareas pendientes de hoy pasan a los días que quedan.
+ * Devuelve mensajes con lo que se ha hecho.
+ */
+export async function hoyNoPuedo() {
+  const hoy = hoyISO();
+  const manana = sumarDias(hoy, 1);
+  const mensajes = [];
+  const deHoy = datos.tareas.filter((t) => t.dia_asignado === hoy && t.estado !== 'hecha' && t.tipo !== 'clase');
+  for (const semanaId of [...new Set(deHoy.map((t) => t.semanaId))]) {
+    const mias = deHoy.filter((t) => t.semanaId === semanaId);
+    await guardar('tareas', mias.map((t) => ({ ...t, fijada: false, recolocadaDesde: hoy })));
+    const uids = mias.map((t) => t.uid);
+    let r = await repartirSemana(semanaId, uids, manana);
+    if (uids.some((u) => r.asignacion[u] == null)) r = await repartirSemana(semanaId, null, manana);
+    for (const t of mias) {
+      const dia = r.asignacion[t.uid];
+      mensajes.push(dia ? `«${t.titulo}» → ${textoCorto(dia)}` : `«${t.titulo}» ya no cabe esta semana`);
+    }
+  }
+  return mensajes;
+}
+
+/** Texto para pedir a otra IA que convierta el PDF de la academia en el JSON de la app. */
+export function instruccionesIA() {
+  const hoy = hoyISO();
+  let viernes = inicioSemanaAcademia(hoy);
+  if (datos.semanas.some((s) => s.inicio === viernes)) viernes = sumarDias(viernes, 7); // ya tienes esta: la siguiente
+  const jueves = sumarDias(viernes, 6);
+  return `Te adjunto la guía de estudio semanal de mi academia (oposición de Bombero Forestal, Comunitat Valenciana).
+Conviértela en un JSON con EXACTAMENTE este formato. Responde SOLO con el JSON, sin explicaciones ni \`\`\`.
+
+{
+  "semana": "${viernes} a ${jueves}",
+  "fecha_limite": "${jueves}T17:00",
+  "prioridad": ["Tema más importante", "Siguiente tema"],
+  "plan_minimo": "Texto del plan de mínimos de la academia (o cadena vacía)",
+  "tareas": [
+    {"id": "t1", "titulo": "Estudiar apartado 4 PEIF", "tema": "PEIF", "tipo": "estudio", "obligatoria": true, "dia_sugerido": "${viernes}", "minutos": 120, "minimo": false}
+  ]
+}
+
+Reglas:
+- La semana va de viernes a jueves. El jueves a las 17:00 hay clase: es la fecha límite.
+- "tipo" solo puede ser: estudio, test, autoevaluacion, repaso, psicotecnico, clase (sin tildes).
+- "estudio" = temario nuevo. Repasar lo ya visto = "repaso".
+- "obligatoria": true o false (sin comillas). Si la guía no dice que es opcional, es obligatoria.
+- "minimo": true solo para las tareas que la academia incluye en su plan de mínimos.
+- "minutos": número entero estimado (si la guía no lo dice, calcula: estudio 60-120, test 20-30, repaso 20-30, psicotécnico 30-45).
+- "dia_sugerido": fecha "AAAA-MM-DD" del día que propone la guía (entre ${viernes} y ${jueves}), o null si no indica día.
+- "tema": usa siempre el mismo nombre para el mismo tema (p. ej. "PEIF", "Reglamento SBF", "SGISE", "Fichas PE", "Fichas PH", "Psicotécnico").
+- Pon las tareas en el orden lógico de la guía (primero el estudio de un tema y después su test).
+- "id": t1, t2, t3... sin repetir.
+- Usa comillas rectas ("), nunca tipográficas.`;
 }
 
 /** Mueve una tarea a mano a otro día (queda "fijada": el reparto ya no la mueve). */

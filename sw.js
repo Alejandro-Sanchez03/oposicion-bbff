@@ -6,15 +6,16 @@
 // número de VERSION (y window.VERSION_APP en js/app.js). Así los dispositivos
 // detectan que hay versión nueva y muestran el botón "Actualizar".
 // =====================================================================
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 const CACHE = `oposicion-bbff-${VERSION}`;
 
 const ARCHIVOS = [
   './', 'index.html', 'manifest.json', 'frases.json', 'css/estilos.css',
   'js/app.js', 'js/db.js', 'js/ajustes.js', 'js/fechas.js', 'js/turnos.js', 'js/reparto.js',
-  'js/guia.js', 'js/racha.js', 'js/frases.js', 'js/ui.js', 'js/temporizador.js',
+  'js/guia.js', 'js/racha.js', 'js/bienvenida.js', 'js/frases.js', 'js/ui.js', 'js/temporizador.js',
   'js/pantallas/hoy.js', 'js/pantallas/semana.js', 'js/pantallas/calendario.js',
   'js/pantallas/progreso.js', 'js/pantallas/ajustes.js',
+  'fuentes/bricolage.woff2', 'fuentes/inter.woff2',
   'iconos/icono-192.png', 'iconos/icono-512.png', 'iconos/icono-maskable-512.png',
 ];
 

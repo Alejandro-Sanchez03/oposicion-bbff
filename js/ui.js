@@ -9,14 +9,41 @@ export function esc(texto) {
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-/** Muestra un aviso breve abajo de la pantalla. */
-export function toast(mensaje) {
+/**
+ * Muestra un aviso breve abajo de la pantalla.
+ * Opcionalmente con un botón (p. ej. Deshacer): toast('Hecha', { boton: 'Deshacer', alPulsar: fn })
+ */
+export function toast(mensaje, { boton = null, alPulsar = null } = {}) {
+  document.querySelectorAll('.toast').forEach((t) => t.remove());
   const el = document.createElement('div');
   el.className = 'toast';
-  el.textContent = mensaje;
+  el.innerHTML = `<span>${esc(mensaje)}</span>${boton ? `<button>${esc(boton)}</button>` : ''}`;
+  if (boton) el.querySelector('button').onclick = () => { el.remove(); alPulsar(); };
   document.body.appendChild(el);
   setTimeout(() => el.classList.add('visible'), 10);
-  setTimeout(() => { el.classList.remove('visible'); setTimeout(() => el.remove(), 300); }, 2800);
+  setTimeout(() => { el.classList.remove('visible'); setTimeout(() => el.remove(), 300); }, boton ? 5000 : 2800);
+}
+
+/** Pequeña celebración: chispas que suben desde un punto (o el centro) + vibración. */
+export function celebrar(origen = null) {
+  const r = origen ? origen.getBoundingClientRect() : null;
+  const x = r ? r.left + r.width / 2 : innerWidth / 2;
+  const y = r ? r.top + r.height / 2 : innerHeight / 2;
+  const capa = document.createElement('div');
+  capa.className = 'chispas';
+  for (let i = 0; i < 26; i++) {
+    const c = document.createElement('i');
+    c.style.left = `${x}px`;
+    c.style.top = `${y}px`;
+    c.style.setProperty('--dx', `${(Math.random() - 0.5) * 220}px`);
+    c.style.setProperty('--dy', `${-60 - Math.random() * 200}px`);
+    c.style.setProperty('--t', `${0.7 + Math.random() * 0.6}s`);
+    c.style.setProperty('--h', `${15 + Math.random() * 35}`);
+    capa.appendChild(c);
+  }
+  document.body.appendChild(capa);
+  setTimeout(() => capa.remove(), 1500);
+  if (navigator.vibrate) navigator.vibrate(40);
 }
 
 /**

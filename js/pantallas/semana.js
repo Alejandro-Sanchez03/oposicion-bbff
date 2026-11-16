@@ -6,7 +6,7 @@ import { hoyISO, textoCorto, rangoFechas, sumarDias } from '../fechas.js';
 import { tipoDia, capacidadDia } from '../turnos.js';
 import {
   validarGuia, importarGuia, repartirSemana, moverTarea, minutosOcupados,
-  semanaDe, ejemploGuia, NOMBRE_TIPO,
+  semanaDe, ejemploGuia, NOMBRE_TIPO, ICONO_TIPO, instruccionesIA,
 } from '../guia.js';
 import { ordenarTareasDelDia } from '../reparto.js';
 import { esc, dialogo, confirmar, toast } from '../ui.js';
@@ -22,9 +22,13 @@ export function render(cont, app) {
   const s = semanas.find((x) => x.id === semanaVista);
 
   cont.innerHTML = `
+    <p class="antetitulo">Guía de la academia</p>
     <h1>Semana</h1>
+    <div class="pasos-guia">
+      <button class="paso-guia" data-acc="copiar-ia"><b>1</b><span>Copiar instrucciones<br><small>para la IA, junto al PDF</small></span></button>
+      <button class="paso-guia principal" data-acc="importar"><b>2</b><span>Cargar la guía<br><small>pega el JSON que te dé</small></span></button>
+    </div>
     <div class="fila-botones">
-      <button class="boton primario" data-acc="importar">📋 Cargar guía (JSON)</button>
       ${semanas.length > 1 ? `<select class="selector" data-acc="elegir">
         ${semanas.map((x) => `<option value="${x.id}" ${x.id === semanaVista ? 'selected' : ''}>${esc(x.texto)}</option>`).join('')}
       </select>` : ''}
@@ -41,6 +45,17 @@ export function render(cont, app) {
     const acc = b.dataset.acc;
     const t = datos.tareas.find((x) => x.uid === b.dataset.uid);
 
+    if (acc === 'copiar-ia') {
+      const texto = instruccionesIA();
+      try {
+        await navigator.clipboard.writeText(texto);
+        toast('Instrucciones copiadas. Pégalas en la IA y adjunta el PDF.');
+      } catch {
+        // Si el navegador no deja copiar solo, se muestran para copiarlas a mano.
+        await dialogo(`<h3>Instrucciones para la IA</h3><p class="ayuda">Mantén pulsado el texto → Seleccionar todo → Copiar.</p>
+          <textarea rows="14" readonly>${esc(texto)}</textarea>`);
+      }
+    }
     if (acc === 'importar') {
       const id = await dialogoImportar();
       if (id) { semanaVista = id; app.refrescar(); }
@@ -146,7 +161,7 @@ function filaTarea(t, s) {
   return `<div class="fila-tarea ${hecha ? 'hecha' : ''}">
     <button class="check-redondo" data-acc="hecha" data-uid="${t.uid}" aria-label="Marcar hecha">${hecha ? '✓' : ''}</button>
     <div class="fila-tarea-texto">
-      <div>${t.fijada ? '📌 ' : ''}${esc(t.titulo)}</div>
+      <div>${ICONO_TIPO[t.tipo]} ${t.fijada ? '📌 ' : ''}${esc(t.titulo)}</div>
       <small>${esc(t.tema)}${NOMBRE_TIPO[t.tipo] !== t.tema ? ` · ${NOMBRE_TIPO[t.tipo]}` : ''} · ${t.minutos} min${t.obligatoria ? '' : ' · opcional'}${t.minimo ? ' · mínimos' : ''}</small>
     </div>
     ${hecha ? '' : `<div class="fila-tarea-botones">
@@ -179,11 +194,18 @@ async function dialogoImportar(texto = '', errores = []) {
     <p class="ayuda">Pega el JSON que te ha generado la IA a partir del PDF de la academia.</p>
     ${errores.length ? `<div class="aviso peligro"><b>Hay ${errores.length} error(es):</b><ul>${errores.map((e) => `<li>${esc(e)}</li>`).join('')}</ul></div>` : ''}
     <textarea name="json" rows="12" spellcheck="false" placeholder='{ "semana": "2026-11-13 a 2026-11-19", ... }'>${esc(texto)}</textarea>`,
-  [{ texto: 'Cancelar', valor: 'cancelar' }, { texto: 'Ver ejemplo', valor: 'ejemplo' }, { texto: 'Importar', valor: 'importar', clase: 'primario' }],
+  [{ texto: 'Cancelar', valor: 'cancelar' }, { texto: 'Ver ejemplo', valor: 'ejemplo' },
+    { texto: '📋 Pegar', valor: 'pegar' }, { texto: 'Importar', valor: 'importar', clase: 'primario' }],
   (form, valor) => ({ valor, texto: form.json.value }));
 
   if (!res || res.valor === 'cancelar') return null;
   if (res.valor === 'ejemplo') return dialogoImportar(ejemploGuia());
+  if (res.valor === 'pegar') {
+    let pegado = res.texto;
+    try { pegado = await navigator.clipboard.readText(); } catch { toast('No se pudo leer el portapapeles: pega a mano'); }
+    // Si la IA lo envolvió en ```json ... ```, se limpia.
+    return dialogoImportar(pegado.replace(/^\s*```(json)?/i, '').replace(/```\s*$/, '').trim());
+  }
   const { guia, errores: errs } = validarGuia(res.texto);
   if (errs) return dialogoImportar(res.texto, errs);
 

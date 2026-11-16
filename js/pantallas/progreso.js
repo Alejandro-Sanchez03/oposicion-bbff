@@ -31,6 +31,7 @@ function temasDeTests() {
 
 export function render(cont, app) {
   cont.innerHTML = `
+    <p class="antetitulo">Tests y temario</p>
     <h1>Progreso</h1>
     <div class="pestanas">
       <button class="pestana ${pestana === 'tests' ? 'activa' : ''}" data-pest="tests">📝 Tests</button>

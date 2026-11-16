@@ -24,10 +24,13 @@ trabajando a turnos. Se abre en **HOY** y te dice exactamente qué toca.
 | `js/guia.js` | Importar y validar la guía JSON, recolocar tareas atrasadas |
 | `js/racha.js` | Mínimo diario, racha y comodines |
 | `js/frases.js` + `frases.json` | Frase motivadora del día (edita `frases.json` para añadir/quitar) |
-| `js/temporizador.js` | Temporizador pomodoro |
+| `js/temporizador.js` | Temporizador pomodoro (se recupera si se cierra la app) |
+| `js/bienvenida.js` | Asistente de la primera vez |
+| `fuentes/` | Tipografías incluidas (Bricolage Grotesque e Inter, licencia OFL) |
 | `js/pantallas/*.js` | Una archivo por pantalla: hoy, semana, calendario, progreso, ajustes |
 | `sw.js` | Funcionamiento sin conexión (⚠ sube `VERSION` al publicar cambios) |
 | `tests/probar-reparto.mjs` | Prueba del reparto: `node tests/probar-reparto.mjs` |
+| `tests/guia-ejemplo.json` | Guía de ejemplo para probar la importación |
 
 ## Formato de la guía semanal
 
