@@ -348,6 +348,27 @@ textarea { font-family: ui-monospace, monospace; font-size: 0.85rem; min-height:
 .opcion-dia { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--borde); border-radius: 12px; }
 .opcion-dia input { width: 22px; min-height: 22px; }
 
+.subir-pdf { display: flex; align-items: center; gap: 14px; cursor: pointer; color: #fff; border-radius: 22px;
+  padding: 16px 18px; margin: 4px 0 10px; background: linear-gradient(135deg, var(--primario), var(--primario-2));
+  box-shadow: var(--sombra-fuerte); }
+.subir-pdf:active { transform: scale(0.98); }
+.subir-pdf-icono { flex: none; width: 54px; height: 54px; border-radius: 16px; display: grid; place-items: center;
+  font-size: 1.7rem; background: rgb(255 255 255 / 0.2); }
+.subir-pdf b { display: block; font-family: var(--titulos); font-size: 1.2rem; }
+.subir-pdf small { color: rgb(255 255 255 / 0.88); }
+.otras-formas { margin: 4px 0 8px; }
+.otras-formas summary { cursor: pointer; color: var(--texto-suave); font-weight: 600; padding: 8px 4px; }
+.vista-pdf { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.fila-pdf { display: grid; grid-template-columns: 26px 54px 1fr 74px; align-items: center; gap: 8px;
+  padding: 8px 10px; border: 1px solid var(--borde); border-radius: 12px; background: var(--tarjeta); }
+.fila-pdf.opcional { background: var(--tarjeta-2); }
+.fila-pdf input[type=checkbox] { width: 22px; min-height: 22px; accent-color: var(--primario); }
+.fila-pdf-dia { font-weight: 700; font-size: 0.85rem; color: var(--texto-suave); }
+.fila-pdf-titulo { font-weight: 600; line-height: 1.25; }
+.fila-pdf-titulo small { display: block; font-weight: 500; }
+.fila-pdf-min { min-height: 42px; padding: 6px; text-align: center; }
+span.fila-pdf-min { color: var(--texto-suave); }
+
 /* =====================================================================
    CALENDARIO
    ===================================================================== */

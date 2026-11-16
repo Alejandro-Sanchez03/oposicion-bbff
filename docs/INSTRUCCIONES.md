@@ -36,11 +36,13 @@ Repite en el móvil si quieres tenerla también allí.
 
 1. La primera vez se abre un **asistente** de 4 pasos: fecha del examen (opcional), tu ciclo de turnos
    y cuántos minutos puedes dedicar. Luego podrás corregir días sueltos en **Calendario** tocándolos.
-2. **Cada semana, con la guía de la academia:**
-   1. En **Semana**, pulsa **«1 · Copiar instrucciones»**.
-   2. Abre la otra IA, **pega** las instrucciones y **adjunta el PDF** de la academia.
-   3. Copia el JSON que te devuelva.
-   4. Vuelve a la app: **«2 · Cargar la guía» → 📋 Pegar → Importar**. Si tiene errores, te dirá cuáles.
+2. **Cada semana, con la guía de la academia (PDF):**
+   - En **Semana**, pulsa **«📄 Subir el PDF de la academia»** y elige el PDF.
+     O, más rápido: abre el PDF en el móvil → **Compartir → Oposición BF**.
+   - La app te enseña lo que ha entendido. Ajusta los **minutos** de cada tarea si hace falta
+     (los recuerda para la próxima semana) y pulsa **Importar y repartir**.
+   - Si algún día la academia cambia el formato y no lo lee, usa **«Otras formas de cargar la guía»**
+     (copiar instrucciones para otra IA y pegar el JSON).
 3. **Cada día:** abre la app y pulsa el gran botón **▶ EMPEZAR**. Ya está.
    - Si vas reventado: **⚡ Solo 10 min**.
    - Si hoy es imposible: **🛌 Hoy no puedo** (pasa las tareas a otros días).

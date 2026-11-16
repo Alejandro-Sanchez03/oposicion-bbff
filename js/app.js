@@ -16,7 +16,7 @@ import * as progreso from './pantallas/progreso.js';
 import * as pantallaAjustes from './pantallas/ajustes.js';
 
 // Cambia este número cada vez que publiques una versión nueva (y también en sw.js).
-window.VERSION_APP = '1.1.0';
+window.VERSION_APP = '1.2.0';
 
 const PANTALLAS = { hoy, semana, calendario, progreso, ajustes: pantallaAjustes };
 
@@ -86,9 +86,11 @@ if ('serviceWorker' in navigator) {
     });
     reg.update().catch(() => {});
   });
+  // Recargar solo cuando se ha pulsado "Actualizar" (no la primera vez que se instala).
+  const habiaVersionAnterior = !!navigator.serviceWorker.controller;
   let recargando = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!recargando) { recargando = true; location.reload(); }
+    if (habiaVersionAnterior && !recargando) { recargando = true; location.reload(); }
   });
 }
 

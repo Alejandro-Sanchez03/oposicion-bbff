@@ -22,6 +22,8 @@ trabajando a turnos. Se abre en **HOY** y te dice exactamente qué toca.
 | `js/turnos.js` | Saber si un día es TURNO o LIBRE (patrón + correcciones) |
 | `js/reparto.js` | **El algoritmo de reparto** de tareas (reglas explicadas al principio) |
 | `js/guia.js` | Importar y validar la guía JSON, recolocar tareas atrasadas |
+| `js/lector-pdf.js` | **Lee el PDF de la academia** (tabla V-13…J-19) sin IA ni internet. Si cambia el formato, se ajusta aquí |
+| `vendor/pdfjs/` | pdf.js de Mozilla (Apache 2.0), para leer PDFs dentro de la app |
 | `js/racha.js` | Mínimo diario, racha y comodines |
 | `js/frases.js` + `frases.json` | Frase motivadora del día (edita `frases.json` para añadir/quitar) |
 | `js/temporizador.js` | Temporizador pomodoro (se recupera si se cierra la app) |
@@ -31,6 +33,7 @@ trabajando a turnos. Se abre en **HOY** y te dice exactamente qué toca.
 | `sw.js` | Funcionamiento sin conexión (⚠ sube `VERSION` al publicar cambios) |
 | `tests/probar-reparto.mjs` | Prueba del reparto: `node tests/probar-reparto.mjs` |
 | `tests/guia-ejemplo.json` | Guía de ejemplo para probar la importación |
+| `tests/probar-pdf.mjs` | Prueba el lector con un PDF real: `node tests/probar-pdf.mjs guia.pdf` |
 
 ## Formato de la guía semanal
 

@@ -9,7 +9,9 @@ import {
   semanaDe, ejemploGuia, NOMBRE_TIPO, ICONO_TIPO, instruccionesIA,
 } from '../guia.js';
 import { ordenarTareasDelDia } from '../reparto.js';
-import { esc, dialogo, confirmar, toast } from '../ui.js';
+import { esc, dialogo, confirmar, toast, avisar } from '../ui.js';
+import { ajustes, cambiarAjustes } from '../ajustes.js';
+import { textoCorto as corto } from '../fechas.js';
 
 let semanaVista = null; // id de la semana que se está viendo
 
@@ -24,10 +26,18 @@ export function render(cont, app) {
   cont.innerHTML = `
     <p class="antetitulo">Guía de la academia</p>
     <h1>Semana</h1>
-    <div class="pasos-guia">
-      <button class="paso-guia" data-acc="copiar-ia"><b>1</b><span>Copiar instrucciones<br><small>para la IA, junto al PDF</small></span></button>
-      <button class="paso-guia principal" data-acc="importar"><b>2</b><span>Cargar la guía<br><small>pega el JSON que te dé</small></span></button>
-    </div>
+    <label class="subir-pdf">
+      <span class="subir-pdf-icono">📄</span>
+      <span><b>Subir el PDF de la academia</b><small>La app lo lee y reparte la semana. Gratis y sin internet.</small></span>
+      <input type="file" accept="application/pdf,.pdf" data-acc="pdf" hidden>
+    </label>
+    <details class="otras-formas">
+      <summary>Otras formas de cargar la guía</summary>
+      <div class="pasos-guia">
+        <button class="paso-guia" data-acc="copiar-ia"><b>1</b><span>Copiar instrucciones<br><small>para otra IA, junto al PDF</small></span></button>
+        <button class="paso-guia" data-acc="importar"><b>2</b><span>Pegar el JSON<br><small>que te devuelva la IA</small></span></button>
+      </div>
+    </details>
     <div class="fila-botones">
       ${semanas.length > 1 ? `<select class="selector" data-acc="elegir">
         ${semanas.map((x) => `<option value="${x.id}" ${x.id === semanaVista ? 'selected' : ''}>${esc(x.texto)}</option>`).join('')}
@@ -35,9 +45,26 @@ export function render(cont, app) {
     </div>
     ${s ? vistaSemana(s, hoy) : '<div class="vacio"><p>Pega aquí la guía de la academia en formato JSON.</p></div>'}`;
 
-  cont.onchange = (e) => {
+  cont.onchange = async (e) => {
     if (e.target.dataset.acc === 'elegir') { semanaVista = e.target.value; app.refrescar(); }
+    if (e.target.dataset.acc === 'pdf' && e.target.files[0]) {
+      const id = await importarPDF(await e.target.files[0].arrayBuffer());
+      e.target.value = '';
+      if (id) { semanaVista = id; app.refrescar(); }
+    }
   };
+
+  // PDF recibido con "Compartir → Oposición BF" desde otra app (lo guarda sw.js)
+  if (location.hash.includes('pdf=compartido')) {
+    history.replaceState(null, '', '#/semana');
+    caches.open('compartido').then(async (c) => {
+      const r = await c.match('pdf-compartido');
+      if (!r) return;
+      await c.delete('pdf-compartido');
+      const id = await importarPDF(await r.arrayBuffer());
+      if (id) { semanaVista = id; app.refrescar(); }
+    });
+  }
 
   cont.onclick = async (e) => {
     const b = e.target.closest('[data-acc]');
@@ -209,6 +236,11 @@ async function dialogoImportar(texto = '', errores = []) {
   const { guia, errores: errs } = validarGuia(res.texto);
   if (errs) return dialogoImportar(res.texto, errs);
 
+  return importarValidada(guia);
+}
+
+/** Guarda una guía ya comprobada (pregunta si se sustituye y ofrece el plan de mínimos). */
+async function importarValidada(guia) {
   const existe = datos.semanas.some((x) => x.id === guia.semana.split(' a ')[0]);
   if (existe && !(await confirmar('Ya tienes cargada esa semana. ¿Sustituirla? (Se conserva lo que ya hayas marcado como hecho.)', 'Sustituir'))) return null;
   const r = await importarGuia(guia);
@@ -220,4 +252,62 @@ async function dialogoImportar(texto = '', errores = []) {
     if (ok) { await guardar('semanas', { ...sem, modoMinimos: true }); await repartirSemana(sem.id); }
   }
   return guia.semana.split(' a ')[0];
+}
+
+// =====================================================================
+// Importar desde el PDF de la academia
+// =====================================================================
+const ICONOS = ICONO_TIPO;
+
+/** Lee el PDF, enseña lo que ha entendido y, si das el visto bueno, lo importa. */
+async function importarPDF(buffer) {
+  toast('Leyendo el PDF…');
+  let r;
+  try {
+    const { leerTextoPDF, analizarGuia } = await import('../lector-pdf.js');
+    r = analizarGuia(await leerTextoPDF(buffer), undefined, ajustes().minutosPDF || undefined);
+  } catch (err) {
+    console.error(err);
+    await avisar(`No he podido abrir el PDF (${esc(err.message)}).`);
+    return null;
+  }
+  if (r.error) {
+    await avisar(`${esc(r.error)}<br><br>Puedes usar «Otras formas de cargar la guía» (con otra IA).`);
+    return null;
+  }
+  const g = r.guia;
+  const res = await dialogo(`
+    <h3>📄 Esto es lo que he entendido</h3>
+    <p><b>Semana ${corto(g.semana.slice(0, 10))} – ${corto(g.fecha_limite.slice(0, 10))}</b> · clase el jueves a las ${g.fecha_limite.slice(11)}</p>
+    <p class="ayuda">Prioridad: ${g.prioridad.map(esc).join(' › ')}</p>
+    <p class="aviso info">⏱ El PDF no dice cuánto dura cada tarea. Ajusta los minutos si hace falta y desmarca lo que no quieras.</p>
+    <div class="vista-pdf">${g.tareas.map((t, i) => `
+      <label class="fila-pdf ${t.obligatoria ? '' : 'opcional'} ${t.tipo === 'clase' ? 'es-clase' : ''}">
+        <input type="checkbox" name="usar${i}" checked>
+        <span class="fila-pdf-dia">${corto(t.dia_sugerido)}</span>
+        <span class="fila-pdf-titulo">${ICONOS[t.tipo]} ${esc(t.titulo)}
+          <small>${t.obligatoria ? 'obligatoria' : 'opcional'}${t.minimo ? ' · mínimos' : ''}</small></span>
+        ${t.tipo === 'clase' ? '<span class="fila-pdf-min">—</span>'
+          : `<input class="fila-pdf-min" type="number" name="min${i}" min="5" step="5" inputmode="numeric" value="${t.minutos}" aria-label="Minutos">`}
+      </label>`).join('')}
+    </div>`,
+  [{ texto: 'Cancelar', valor: false }, { texto: 'Importar y repartir', valor: true, clase: 'primario' }],
+  (form, ok) => {
+    if (!ok) return null;
+    return g.tareas
+      .map((t, i) => ({ ...t, minutos: form[`min${i}`] ? Math.max(5, Number(form[`min${i}`].value) || t.minutos) : t.minutos, usar: form[`usar${i}`].checked }))
+      .filter((t) => t.usar)
+      .map(({ usar, ...t }) => t);
+  });
+  if (!res) return null;
+
+  // Recordar los minutos elegidos por tipo para la próxima vez
+  const porTipo = { ...(ajustes().minutosPDF || {}) };
+  for (const t of res) if (t.tipo !== 'clase') porTipo[t.tipo] = t.minutos;
+  await cambiarAjustes({ minutosPDF: porTipo });
+
+  const guia = { ...g, tareas: res };
+  const { errores } = validarGuia(JSON.stringify(guia));
+  if (errores) { await avisar(`Algo no cuadra: ${errores.map(esc).join('<br>')}`); return null; }
+  return importarValidada(guia);
 }
