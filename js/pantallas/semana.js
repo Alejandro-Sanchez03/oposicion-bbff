@@ -45,6 +45,8 @@ export function render(cont, app) {
     </div>
     ${s ? vistaSemana(s, hoy) : '<div class="vacio"><p>Pega aquí la guía de la academia en formato JSON.</p></div>'}`;
 
+  activarArrastre(cont, s, app);
+
   cont.onchange = async (e) => {
     if (e.target.dataset.acc === 'elegir') { semanaVista = e.target.value; app.refrescar(); }
     if (e.target.dataset.acc === 'pdf' && e.target.files[0]) {
@@ -158,14 +160,14 @@ function vistaSemana(s, hoy) {
 
     ${rangoFechas(s.inicio, s.fin).map((f) => vistaDia(f, tareas, s, hoy)).join('')}
 
-    ${sinDia.length ? `<section class="dia sin-hueco"><h3>Sin hueco esta semana (${sinDia.length})</h3>
+    ${sinDia.length ? `<section class="dia sin-hueco" data-fecha=""><h3>Sin hueco esta semana (${sinDia.length})</h3>
       ${sinDia.map((t) => filaTarea(t, s)).join('')}</section>` : ''}
 
     <div class="fila-botones separada">
       <button class="boton pequeno" data-acc="repartir-todo">Soltar lo movido a mano y repartir todo</button>
       <button class="boton pequeno peligro" data-acc="borrar-semana">🗑 Borrar esta semana</button>
     </div>
-    <p class="ayuda">Para mover una tarea usa ◀ ▶ (un día antes/después) o «Mover a…». Las tareas que mueves a mano llevan 📌 y el reparto automático ya no las toca.</p>`;
+    <p class="ayuda">Para mover una tarea, <b>arrástrala por el asa ⠿</b> hasta otro día, o usa ◀ ▶ (un día antes/después) o «Mover a…». Las tareas que mueves a mano llevan 📌 y el reparto automático ya no las toca.</p>`;
 }
 
 function vistaDia(f, tareas, s, hoy) {
@@ -173,7 +175,7 @@ function vistaDia(f, tareas, s, hoy) {
   const deDia = ordenarTareasDelDia(tareas.filter((t) => t.dia_asignado === f));
   const ocupado = minutosOcupados(f);
   const cap = capacidadDia(f);
-  return `<section class="dia ${f < hoy ? 'pasado' : ''} ${f === hoy ? 'es-hoy' : ''}">
+  return `<section class="dia ${f < hoy ? 'pasado' : ''} ${f === hoy ? 'es-hoy' : ''}" data-fecha="${f}">
     <h3><span>${textoCorto(f)}${f === hoy ? ' · HOY' : ''}</span>
       <span class="etiqueta-dia mini ${tipo || 'nada'}">${tipo ? tipo.toUpperCase() : 'SIN DEFINIR'}</span>
       <span class="ocupacion ${ocupado > cap ? 'excede' : ''}">${ocupado}/${cap} min</span></h3>
@@ -185,7 +187,8 @@ function vistaDia(f, tareas, s, hoy) {
 function filaTarea(t, s) {
   const hecha = t.estado === 'hecha';
   if (t.tipo === 'clase') return `<div class="fila-tarea clase">🎓 ${esc(t.titulo)} <small>17:00–20:00</small></div>`;
-  return `<div class="fila-tarea ${hecha ? 'hecha' : ''}">
+  return `<div class="fila-tarea ${hecha ? 'hecha' : ''}" data-uid="${t.uid}">
+    ${hecha ? '' : '<span class="asa" aria-label="Arrastrar a otro día" title="Arrastra para cambiar de día">⠿</span>'}
     <button class="check-redondo" data-acc="hecha" data-uid="${t.uid}" aria-label="Marcar hecha">${hecha ? '✓' : ''}</button>
     <div class="fila-tarea-texto">
       <div>${ICONO_TIPO[t.tipo]} ${t.fijada ? '📌 ' : ''}${esc(t.titulo)}</div>
@@ -310,4 +313,73 @@ async function importarPDF(buffer) {
   const { errores } = validarGuia(JSON.stringify(guia));
   if (errores) { await avisar(`Algo no cuadra: ${errores.map(esc).join('<br>')}`); return null; }
   return importarValidada(guia);
+}
+
+// =====================================================================
+// Arrastrar tareas con el dedo (o el lápiz) de un día a otro.
+// Se arrastra desde el asa ⠿ para no estorbar al desplazamiento normal.
+// =====================================================================
+function activarArrastre(cont, semana, app) {
+  if (!semana || cont.dataset.arrastre) return;
+  cont.dataset.arrastre = '1'; // solo se engancha una vez al contenedor
+
+  let arr = null; // { uid, fantasma, destino, dx, dy, scroll }
+
+  cont.addEventListener('pointerdown', (e) => {
+    const asa = e.target.closest('.asa');
+    if (!asa) return;
+    const fila = asa.closest('.fila-tarea');
+    e.preventDefault();
+    const r = fila.getBoundingClientRect();
+    const fantasma = fila.cloneNode(true);
+    fantasma.classList.add('fantasma');
+    fantasma.style.width = `${r.width}px`;
+    document.body.appendChild(fantasma);
+    fila.classList.add('arrastrando');
+    arr = { uid: fila.dataset.uid, fila, fantasma, destino: null, dx: e.clientX - r.left, dy: e.clientY - r.top, y: e.clientY };
+    mover(e);
+    // Desplazamiento automático cerca de los bordes
+    arr.scroll = setInterval(() => {
+      if (!arr) return;
+      if (arr.y < 90) window.scrollBy(0, -12);
+      else if (arr.y > innerHeight - 140) window.scrollBy(0, 12);
+    }, 30);
+    asa.setPointerCapture?.(e.pointerId);
+  });
+
+  function mover(e) {
+    if (!arr) return;
+    arr.y = e.clientY;
+    arr.fantasma.style.transform = `translate(${e.clientX - arr.dx}px, ${e.clientY - arr.dy}px) rotate(-1.5deg)`;
+    arr.fantasma.style.visibility = 'hidden';
+    const debajo = document.elementFromPoint(e.clientX, e.clientY);
+    arr.fantasma.style.visibility = '';
+    const dia = debajo?.closest('.dia[data-fecha]');
+    if (arr.destino !== dia) {
+      arr.destino?.classList.remove('soltar-aqui');
+      dia?.classList.add('soltar-aqui');
+      arr.destino = dia;
+    }
+  }
+
+  cont.addEventListener('pointermove', mover);
+
+  async function terminar(cancelado) {
+    if (!arr) return;
+    const { uid, fila, fantasma, destino, scroll } = arr;
+    arr = null;
+    clearInterval(scroll);
+    fantasma.remove();
+    fila.classList.remove('arrastrando');
+    destino?.classList.remove('soltar-aqui');
+    if (cancelado || !destino) return;
+    const t = datos.tareas.find((x) => x.uid === uid);
+    const nuevo = destino.dataset.fecha || null;
+    if (!t || nuevo === t.dia_asignado) return;
+    await moverTarea(uid, nuevo);
+    toast(nuevo ? `Movida al ${corto(nuevo)} 📌` : 'Apartada (sin día)');
+    app.refrescar();
+  }
+  cont.addEventListener('pointerup', () => terminar(false));
+  cont.addEventListener('pointercancel', () => terminar(true));
 }

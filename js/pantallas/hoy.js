@@ -22,6 +22,7 @@ import { abrirTemporizador, temporizadorGuardado } from '../temporizador.js';
 import { calcularNota } from './progreso.js';
 import { exportar } from './ajustes.js';
 import { esc, dialogo, pedirTexto, toast, confirmar, celebrar } from '../ui.js';
+import { semanaParaResumen, resumenDe, pasarPendientes, cerrarResumen } from '../resumen.js';
 
 /** Dibujo del monte (crestas y pinos) que va al fondo de la portada. */
 const PAISAJE = `<svg class="hero-paisaje" viewBox="0 0 400 110" preserveAspectRatio="none" aria-hidden="true">
@@ -35,6 +36,7 @@ const ETIQUETA = {
   turno: { txt: 'Día de turno', icono: '🚒' },
   libre: { txt: 'Día libre', icono: '🌲' },
   nada: { txt: 'Día sin definir', icono: '❔' },
+  pausa: { txt: 'Día de descanso', icono: '🏖️' },
 };
 
 export async function render(cont, app) {
@@ -73,7 +75,7 @@ export async function render(cont, app) {
         ${diasExamen != null && diasExamen >= 0 ? `<div class="hero-cuenta"><b>${diasExamen}</b><small>${diasExamen === 1 ? 'día' : 'días'} al examen</small></div>` : ''}
       </div>
       <div class="hero-etiqueta">${ETIQUETA[tipo].icono} ${ETIQUETA[tipo].txt}
-        <span>${tipo === 'nada' ? 'márcalo en Calendario' : `hasta ${capacidadDia(hoy)} min`}</span></div>
+        <span>${tipo === 'nada' ? 'márcalo en Calendario' : tipo === 'pausa' ? 'no cuenta para la racha' : `hasta ${capacidadDia(hoy)} min`}</span></div>
 
       <div class="hero-centro">
         <div class="anillo-racha ${ok ? 'cumplido' : ''}" title="Racha: días seguidos cumpliendo el mínimo">
@@ -106,6 +108,8 @@ export async function render(cont, app) {
         <button data-acc="manual">✏️ Apuntar minutos</button>
       </div>
     </section>
+
+    ${tarjetaResumen(semana)}
 
     ${frase ? `<blockquote class="frase"><p>${esc(frase)}</p>${textoRacha ? `<span>${esc(textoRacha)}</span>` : ''}</blockquote>` : ''}
 
@@ -180,7 +184,39 @@ export async function render(cont, app) {
     }
     if (acc === 'adelantar') await adelantar(app);
     if (acc === 'copia') { await exportar(); app.refrescar(); }
+    if (acc === 'resumen-cerrar') { await cerrarResumen(semanaParaResumen()); app.refrescar(); }
+    if (acc === 'resumen-pasar') {
+      const n = await pasarPendientes(semanaParaResumen());
+      toast(`${n} tarea(s) pasadas a esta semana`);
+      app.refrescar();
+    }
   };
+}
+
+/** Tarjeta con el resumen de la semana que acaba de terminar. */
+function tarjetaResumen(semanaActual) {
+  const s = semanaParaResumen();
+  if (!s) return '';
+  const r = resumenDe(s);
+  const horas = (r.minutos / 60).toFixed(1).replace('.', ',');
+  const pct = r.total ? Math.round((r.hechas / r.total) * 100) : 0;
+  const titular = pct >= 90 ? '¡Semanón! 🔥' : pct >= 60 ? 'Buena semana 💪' : r.hechas ? 'Semana superada' : 'Semana nueva, página nueva';
+  return `<section class="resumen-semana">
+    <div class="resumen-cab"><span>Semana del ${s.texto.replace(' a ', ' al ').replace(/\d{4}-(\d{2})-(\d{2})/g, '$2/$1')}</span><b>${titular}</b></div>
+    <div class="resumen-cifras">
+      <div><b>${r.hechas}/${r.total}</b><small>tareas</small></div>
+      <div><b>${horas} h</b><small>estudiadas</small></div>
+      ${r.contables ? `<div><b>${r.cumplidos}/${r.contables}</b><small>días cumplidos</small></div>` : ''}
+      ${r.media != null ? `<div><b>${r.media.toFixed(1).replace('.', ',')}</b><small>nota media</small></div>` : ''}
+    </div>
+    ${r.pendientes.length ? `<p class="resumen-pend">Quedaron ${r.pendientes.length} sin hacer${r.obligatoriasPendientes.length ? ` (${r.obligatoriasPendientes.length} obligatoria${r.obligatoriasPendientes.length > 1 ? 's' : ''})` : ''}:
+      ${r.pendientes.slice(0, 4).map((t) => esc(t.titulo)).join(' · ')}${r.pendientes.length > 4 ? '…' : ''}</p>` : '<p class="resumen-pend">No quedó nada pendiente. 👏</p>'}
+    <div class="fila-botones">
+      ${r.pendientes.length && semanaActual ? `<button class="boton pequeno primario" data-acc="resumen-pasar">↪ Pasarlas a esta semana</button>` : ''}
+      <button class="boton pequeno" data-acc="resumen-cerrar">${r.pendientes.length ? 'Dejarlas' : 'Cerrar'}</button>
+    </div>
+    ${r.pendientes.length && !semanaActual ? '<p class="ayuda">Carga la guía de esta semana para poder pasarlas.</p>' : ''}
+  </section>`;
 }
 
 /** "2/3 hechas" (sin contar la clase). */

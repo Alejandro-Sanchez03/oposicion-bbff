@@ -4,7 +4,7 @@
 // =====================================================================
 import { ajustes, cambiarAjustes } from '../ajustes.js';
 import { aISO, hoyISO, textoMes, diaSemana, deISO } from '../fechas.js';
-import { tipoDia, esManual, alternarDia, secuenciaDesde } from '../turnos.js';
+import { tipoDia, esManual, alternarDia, secuenciaDesde, marcarPausa } from '../turnos.js';
 import { estadoDia, rachaActual, mejorRacha } from '../racha.js';
 import { dialogo, toast, esc } from '../ui.js';
 import { datos } from '../db.js';
@@ -12,7 +12,7 @@ import { repartirSemana } from '../guia.js';
 
 let anio = null, mes = null; // mes que se está viendo
 
-const MARCA = { cumplido: '✗', comodin: '🃏', fallado: '·' };
+const MARCA = { cumplido: '✗', comodin: '🃏', fallado: '·', pausa: '🏖️' };
 
 export function render(cont, app) {
   if (anio === null) { const h = deISO(hoyISO()); anio = h.getFullYear(); mes = h.getMonth(); }
@@ -32,7 +32,7 @@ export function render(cont, app) {
     celdas += `<button class="cal-dia ${tipo || 'nada'} ${f === hoy ? 'es-hoy' : ''} est-${est}" data-fecha="${f}"
       aria-label="${f} ${tipo || 'sin definir'} ${est}">
       <span class="cal-num">${d}${esManual(f) ? '<sup>✎</sup>' : ''}</span>
-      <span class="cal-tipo">${tipo === 'turno' ? 'T' : tipo === 'libre' ? 'L' : ''}</span>
+      <span class="cal-tipo">${tipo === 'turno' ? 'T' : tipo === 'libre' ? 'L' : tipo === 'pausa' ? 'P' : ''}</span>
       <span class="cal-marca">${MARCA[est] || ''}</span></button>`;
   }
 
@@ -53,13 +53,17 @@ export function render(cont, app) {
     <p class="leyenda">
       <span class="etiqueta-dia mini turno">T = TURNO</span>
       <span class="etiqueta-dia mini libre">L = LIBRE</span>
-      ✗ cumplido · 🃏 comodín · ✎ corregido a mano</p>
+      ✗ cumplido · 🃏 comodín · 🏖️ vacaciones/baja · ✎ corregido a mano</p>
     <p>Este mes: <b>${turnos}</b> días de turno y <b>${libres}</b> libres.</p>
     <p class="ayuda">Toca un día para cambiarlo entre TURNO y LIBRE.</p>
     <section class="tarjeta">
       <h3>Patrón de turnos</h3>
       <p>${p ? `Actual: <b>${p.secuencia}</b> desde el ${p.inicio}` : 'Aún no has definido un patrón.'}</p>
-      <button class="boton primario" data-acc="patron">⚙ Definir patrón</button>
+      <div class="fila-botones">
+        <button class="boton primario" data-acc="patron">⚙ Definir patrón</button>
+        <button class="boton" data-acc="pausa">🏖️ Vacaciones o baja</button>
+      </div>
+      <p class="ayuda">Los días de vacaciones o baja no reciben tareas ni rompen la racha. Toca uno para quitarlo.</p>
     </section>`;
 
   cont.onclick = async (e) => {
@@ -76,6 +80,25 @@ export function render(cont, app) {
       mes += Number(b.dataset.dir);
       if (mes < 0) { mes = 11; anio--; } else if (mes > 11) { mes = 0; anio++; }
       app.refrescar();
+    }
+    if (b.dataset.acc === 'pausa') {
+      const r = await dialogo(`<h3>🏖️ Vacaciones o baja</h3>
+        <p class="ayuda">Esos días no tendrán tareas y no contarán para la racha (ni a favor ni en contra).</p>
+        <div class="dos-columnas">
+          <label class="campo"><span>Desde</span><input type="date" name="desde" value="${hoy}"></label>
+          <label class="campo"><span>Hasta</span><input type="date" name="hasta" value="${hoy}"></label>
+        </div>
+        <label class="campo"><span>Motivo (opcional)</span><input name="motivo" placeholder="Vacaciones, baja, curso..."></label>`,
+      [{ texto: 'Cancelar', valor: false }, { texto: 'Guardar', valor: true, clase: 'primario' }],
+      (form, ok) => (ok && form.desde.value && form.hasta.value
+        ? { desde: form.desde.value, hasta: form.hasta.value < form.desde.value ? form.desde.value : form.hasta.value, motivo: form.motivo.value.trim() }
+        : null));
+      if (r) {
+        await marcarPausa(r.desde, r.hasta, r.motivo);
+        await repartirSemanasAfectadas();
+        toast('Días de descanso guardados');
+        app.refrescar();
+      }
     }
     if (b.dataset.acc === 'patron') {
       const r = await dialogoPatron();

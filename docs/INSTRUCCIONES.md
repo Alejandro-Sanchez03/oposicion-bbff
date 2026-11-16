@@ -49,6 +49,14 @@ Repite en el móvil si quieres tenerla también allí.
    - Al terminar, escribe por dónde vas: lo verás en la nota amarilla «Lo próximo».
    - Al marcar un test como hecho, te pide la nota y la guarda en Progreso.
 
+### Otras cosas útiles
+- **Mover tareas**: en **Semana**, arrastra la tarea por el asa **⠿** hasta otro día (o usa ◀ ▶).
+- **Vacaciones o baja**: en **Calendario → 🏖️ Vacaciones o baja**, elige las fechas. Esos días no tendrán
+  tareas y no romperán la racha. Toca uno de esos días para quitarlo.
+- **Resumen de la semana**: el viernes, en **Hoy**, verás cómo fue la semana anterior y podrás
+  **pasar lo pendiente** a la semana nueva (entra como opcional: la guía nueva manda).
+- **Progreso → Tiempo**: minutos estudiados por día y por semana.
+
 ## 4. Copias de seguridad
 
 Los datos viven solo en el dispositivo. Si borras los datos de Chrome o desinstalas la app,

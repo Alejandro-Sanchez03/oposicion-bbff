@@ -3,10 +3,11 @@
 // =====================================================================
 import { datos, guardar, borrar, nuevoId } from '../db.js';
 import { ajustes } from '../ajustes.js';
-import { hoyISO, textoCorto } from '../fechas.js';
+import { hoyISO, textoCorto, sumarDias, inicioSemanaAcademia, rangoFechas, deISO } from '../fechas.js';
+import { minutosDelDia, rachaActual, mejorRacha } from '../racha.js';
 import { esc, confirmar, dialogo, toast } from '../ui.js';
 
-let pestana = 'tests';
+let pestana = 'estudio';
 let temaGrafica = '__todos';
 
 // Colores de las líneas de la gráfica (uno fijo por tema, siempre en el mismo orden).
@@ -31,15 +32,18 @@ function temasDeTests() {
 
 export function render(cont, app) {
   cont.innerHTML = `
-    <p class="antetitulo">Tests y temario</p>
+    <p class="antetitulo">Tiempo, tests y temario</p>
     <h1>Progreso</h1>
     <div class="pestanas">
+      <button class="pestana ${pestana === 'estudio' ? 'activa' : ''}" data-pest="estudio">⏱️ Tiempo</button>
       <button class="pestana ${pestana === 'tests' ? 'activa' : ''}" data-pest="tests">📝 Tests</button>
       <button class="pestana ${pestana === 'temario' ? 'activa' : ''}" data-pest="temario">📚 Temario</button>
     </div>
     <div id="contenido-progreso"></div>`;
   const zona = cont.querySelector('#contenido-progreso');
-  if (pestana === 'tests') renderTests(zona, app); else renderTemario(zona, app);
+  if (pestana === 'estudio') renderEstudio(zona);
+  else if (pestana === 'tests') renderTests(zona, app);
+  else renderTemario(zona, app);
 
   cont.querySelectorAll('[data-pest]').forEach((b) => b.addEventListener('click', () => {
     pestana = b.dataset.pest; app.refrescar();
@@ -162,8 +166,9 @@ function grafica(temas) {
 
 /** Al tocar (o pasar por encima de) un punto, muestra tema, fecha y nota. */
 function activarTooltip(zona) {
-  const env = zona.querySelector('.grafica-envoltorio');
-  if (!env) return;
+  zona.querySelectorAll('.grafica-envoltorio').forEach(activarTooltipEn);
+}
+function activarTooltipEn(env) {
   const tip = env.querySelector('.tooltip');
   const mostrar = (e) => {
     const p = e.target.closest('.zona-toque');
@@ -176,6 +181,80 @@ function activarTooltip(zona) {
   };
   env.addEventListener('pointerover', mostrar);
   env.addEventListener('click', mostrar);
+}
+
+// ---------------------------------------------------------------- TIEMPO ESTUDIADO
+const hm = (min) => (min >= 60 ? `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')}` : `${min} min`);
+
+function renderEstudio(zona) {
+  const hoy = hoyISO();
+  const a = ajustes();
+  // Últimos 14 días
+  const dias = rangoFechas(sumarDias(hoy, -13), hoy).map((f) => ({ f, min: minutosDelDia(f) }));
+  // Últimas 8 semanas de academia (viernes a jueves)
+  const vierneActual = inicioSemanaAcademia(hoy);
+  const semanas = Array.from({ length: 8 }, (_, i) => sumarDias(vierneActual, -7 * (7 - i))).map((v) => ({
+    f: v, min: rangoFechas(v, sumarDias(v, 6)).reduce((s, f) => s + minutosDelDia(f), 0),
+  }));
+  const estaSemana = semanas[semanas.length - 1].min;
+  const total = datos.sesiones.reduce((s, x) => s + x.minutos, 0);
+  const media14 = Math.round(dias.reduce((s, d) => s + d.min, 0) / 14);
+
+  zona.innerHTML = `
+    <section class="cifras">
+      <div class="cifra"><b>${hm(estaSemana)}</b><small>esta semana</small></div>
+      <div class="cifra"><b>${hm(media14)}</b><small>media diaria (14 días)</small></div>
+      <div class="cifra"><b>${hm(total)}</b><small>en total</small></div>
+      <div class="cifra"><b>🔥 ${rachaActual()}</b><small>racha · mejor ${mejorRacha()}</small></div>
+    </section>
+    <section class="tarjeta">
+      <h3>Últimos 14 días</h3>
+      <div class="grafica-envoltorio">${barras(dias.map((d) => ({
+        valor: d.min, etiqueta: String(deISO(d.f).getDate()), info: `${textoCorto(d.f)} · ${hm(d.min)}`, destacar: d.f === hoy,
+      })), { linea: a.minimoMinutos, textoLinea: `mínimo ${a.minimoMinutos} min`, unidad: 'min' })}</div>
+    </section>
+    <section class="tarjeta">
+      <h3>Por semanas (de viernes a jueves)</h3>
+      <div class="grafica-envoltorio">${barras(semanas.map((w, i) => ({
+        valor: Math.round((w.min / 60) * 10) / 10, etiqueta: i === semanas.length - 1 ? 'Esta' : textoCorto(w.f).split(' ')[1],
+        info: `Semana del ${textoCorto(w.f)} · ${hm(w.min)}`, destacar: i === semanas.length - 1, mostrarValor: true,
+      })), { unidad: 'h' })}</div>
+    </section>`;
+  activarTooltip(zona);
+}
+
+/** Gráfica de barras sencilla en SVG (una sola serie). */
+function barras(datosBarras, { linea = null, textoLinea = '', unidad = '' } = {}) {
+  const W = 640, H = 220, M = { i: 36, d: 10, a: 18, b: 26 };
+  // Escala "redonda": marcas de 1, 2 o 5 × 10^n (p. ej. 0, 10, 20, 30)
+  const bruto = Math.max(unidad === 'h' ? 1 : 10, linea || 0, ...datosBarras.map((d) => d.valor));
+  const potencia = 10 ** Math.floor(Math.log10(bruto / 3));
+  const paso = [1, 2, 5, 10].map((m) => m * potencia).find((p) => p * 3 >= bruto) || potencia * 10;
+  const max = paso * Math.ceil(bruto / paso);
+  const marcas = Math.round(max / paso);
+  const ancho = (W - M.i - M.d) / datosBarras.length;
+  const y = (v) => M.a + (1 - v / max) * (H - M.a - M.b);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" class="grafica" role="img" aria-label="Gráfica de barras">`;
+  // Rejilla: 3 líneas
+  for (let k = 0; k <= marcas; k++) {
+    const v = paso * k;
+    svg += `<line x1="${M.i}" x2="${W - M.d}" y1="${y(v)}" y2="${y(v)}" class="rejilla"/>
+      <text x="${M.i - 6}" y="${y(v) + 4}" class="eje" text-anchor="end">${String(Math.round(v * 10) / 10).replace('.', ',')}</text>`;
+  }
+  datosBarras.forEach((d, i) => {
+    const x = M.i + i * ancho + ancho * 0.18;
+    const w = ancho * 0.64;
+    const alto = Math.max(d.valor > 0 ? 3 : 0, H - M.b - y(d.valor));
+    svg += `<rect x="${x}" y="${H - M.b - alto}" width="${w}" height="${alto}" rx="4" class="barra-dato ${d.destacar ? 'destacada' : ''}"/>
+      <text x="${x + w / 2}" y="${H - 8}" class="eje" text-anchor="middle">${d.etiqueta}</text>
+      ${d.mostrarValor && d.valor > 0 ? `<text x="${x + w / 2}" y="${H - M.b - alto - 5}" class="eje valor" text-anchor="middle">${String(d.valor).replace('.', ',')}</text>` : ''}
+      <rect x="${M.i + i * ancho}" y="${M.a}" width="${ancho}" height="${H - M.a - M.b}" fill="transparent" class="zona-toque" data-info="${esc(d.info)}"/>`;
+  });
+  if (linea) {
+    svg += `<line x1="${M.i}" x2="${W - M.d}" y1="${y(linea)}" y2="${y(linea)}" class="aprobado"/>
+      <text x="${M.i + 6}" y="${y(linea) - 5}" class="eje" text-anchor="start">${esc(textoLinea)}</text>`;
+  }
+  return `${svg}</svg><div class="tooltip" hidden></div>`;
 }
 
 // ---------------------------------------------------------------- TEMARIO

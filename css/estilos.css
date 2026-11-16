@@ -41,6 +41,8 @@
   --hero-turno: linear-gradient(150deg, #7c2d12 0%, #c2410c 48%, #f59e0b 115%);
   --hero-libre: linear-gradient(150deg, #052e16 0%, #166534 50%, #65a30d 120%);
   --hero-nada:  linear-gradient(150deg, #1f2937 0%, #475569 60%, #94a3b8 130%);
+  --hero-pausa: linear-gradient(150deg, #0c4a6e 0%, #0369a1 55%, #38bdf8 125%);
+  --pausa: #0284c7; --pausa-fondo: #e0f2fe; --pausa-texto: #075985;
   /* Colores por tipo de tarea */
   --t-estudio: #2a78d6; --t-test: #eb6834; --t-autoevaluacion: #6250d6;
   --t-repaso: #1baf7a; --t-psicotecnico: #d55181; --t-clase: #c98500;
@@ -68,6 +70,8 @@
     --hero-turno: linear-gradient(150deg, #431407 0%, #9a3412 55%, #d97706 125%);
     --hero-libre: linear-gradient(150deg, #021a0c 0%, #14532d 55%, #4d7c0f 130%);
     --hero-nada:  linear-gradient(150deg, #0f172a 0%, #334155 70%);
+    --hero-pausa: linear-gradient(150deg, #082f49 0%, #075985 60%, #0284c7 130%);
+    --pausa: #38bdf8; --pausa-fondo: #082f49; --pausa-texto: #7dd3fc;
     --t-estudio: #3987e5; --t-test: #d95926; --t-autoevaluacion: #9085e9;
     --t-repaso: #199e70; --t-psicotecnico: #d55181; --t-clase: #c98500;
     --serie-1: #3987e5; --serie-2: #d95926; --serie-3: #199e70; --serie-4: #c98500;
@@ -89,6 +93,8 @@
   --hero-turno: linear-gradient(150deg, #431407 0%, #9a3412 55%, #d97706 125%);
   --hero-libre: linear-gradient(150deg, #021a0c 0%, #14532d 55%, #4d7c0f 130%);
   --hero-nada:  linear-gradient(150deg, #0f172a 0%, #334155 70%);
+  --hero-pausa: linear-gradient(150deg, #082f49 0%, #075985 60%, #0284c7 130%);
+  --pausa: #38bdf8; --pausa-fondo: #082f49; --pausa-texto: #7dd3fc;
   --t-estudio: #3987e5; --t-test: #d95926; --t-autoevaluacion: #9085e9;
   --t-repaso: #199e70; --t-psicotecnico: #d55181; --t-clase: #c98500;
   --serie-1: #3987e5; --serie-2: #d95926; --serie-3: #199e70; --serie-4: #c98500;
@@ -170,6 +176,7 @@ textarea { font-family: ui-monospace, monospace; font-size: 0.85rem; min-height:
 .hero-turno { background: var(--hero-turno); }
 .hero-libre { background: var(--hero-libre); }
 .hero-nada  { background: var(--hero-nada); }
+.hero-pausa { background: var(--hero-pausa); }
 .hero::before { /* brillo cálido arriba a la derecha */
   content: ""; position: absolute; inset: -40% -30% auto auto; width: 70%; aspect-ratio: 1; z-index: -1;
   background: radial-gradient(circle, rgb(255 255 255 / 0.22), transparent 65%); }
@@ -265,6 +272,7 @@ textarea { font-family: ui-monospace, monospace; font-size: 0.85rem; min-height:
 .etiqueta-dia.turno { background: var(--turno-fondo); color: var(--turno-texto); }
 .etiqueta-dia.libre { background: var(--libre-fondo); color: var(--libre-texto); }
 .etiqueta-dia.nada { background: var(--nada-fondo); color: var(--texto-suave); }
+.etiqueta-dia.pausa { background: var(--pausa-fondo); color: var(--pausa-texto); }
 .etiqueta-dia.mini { font-size: 0.72rem; padding: 2px 9px; border-radius: 999px; }
 .barra { height: 8px; border-radius: 999px; background: var(--nada-fondo); overflow: hidden; margin: 8px 0; display: flex; }
 .barra > div { background: linear-gradient(90deg, var(--primario), var(--primario-2)); border-radius: 999px; }
@@ -279,6 +287,21 @@ textarea { font-family: ui-monospace, monospace; font-size: 0.85rem; min-height:
   0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
   100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.2); opacity: 0; }
 }
+
+/* Resumen de la semana pasada */
+.resumen-semana { background: var(--tarjeta); border: 2px solid var(--primario); border-radius: var(--radio);
+  padding: 16px; margin: 0 0 14px; box-shadow: var(--sombra); }
+.resumen-cab span { display: block; font-size: 0.78rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--primario); }
+.resumen-cab b { font-family: var(--titulos); font-size: 1.35rem; }
+.resumen-cifras, .cifras { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 10px 0; }
+.resumen-cifras > div, .cifra { background: var(--tarjeta-2); border-radius: 14px; padding: 10px 12px; }
+.cifra { background: var(--tarjeta); border: 1px solid var(--borde); box-shadow: var(--sombra); }
+.resumen-cifras b, .cifra b { display: block; font-family: var(--titulos); font-size: 1.35rem; line-height: 1.1; }
+.resumen-cifras small, .cifra small { font-size: 0.8rem; }
+.resumen-pend { font-size: 0.92rem; color: var(--texto-suave); }
+.grafica .barra-dato { fill: color-mix(in srgb, var(--primario) 70%, var(--tarjeta)); }
+.grafica .barra-dato.destacada { fill: var(--primario); }
+.grafica .valor { fill: var(--texto); font-weight: 700; }
 
 /* =====================================================================
    TEMPORIZADOR
@@ -369,6 +392,15 @@ textarea { font-family: ui-monospace, monospace; font-size: 0.85rem; min-height:
 .fila-pdf-min { min-height: 42px; padding: 6px; text-align: center; }
 span.fila-pdf-min { color: var(--texto-suave); }
 
+/* Arrastrar tareas */
+.asa { flex: none; width: 30px; height: 44px; display: grid; place-items: center; font-size: 1.3rem; color: var(--texto-suave);
+  cursor: grab; touch-action: none; user-select: none; border-radius: 8px; }
+.asa:active { background: var(--tarjeta-2); cursor: grabbing; }
+.fila-tarea.arrastrando { opacity: 0.35; }
+.fantasma { position: fixed; left: 0; top: 0; z-index: 90; pointer-events: none; background: var(--tarjeta);
+  border: 2px solid var(--primario); border-radius: 14px; padding: 6px 10px; box-shadow: 0 16px 40px rgb(0 0 0 / 0.3); }
+.dia.soltar-aqui { border: 2px dashed var(--primario); background: var(--acento-suave); }
+
 /* =====================================================================
    CALENDARIO
    ===================================================================== */
@@ -383,6 +415,7 @@ span.fila-pdf-min { color: var(--texto-suave); }
   padding: 5px 2px; cursor: pointer; background: var(--nada-fondo); }
 .cal-dia.turno { background: var(--turno-fondo); color: var(--turno-texto); }
 .cal-dia.libre { background: var(--libre-fondo); color: var(--libre-texto); }
+.cal-dia.pausa { background: var(--pausa-fondo); color: var(--pausa-texto); }
 .cal-dia.es-hoy { outline: 3px solid var(--primario); outline-offset: 2px; }
 .cal-num { font-family: var(--titulos); font-weight: 700; font-size: 1rem; }
 .cal-num sup { font-size: 0.55rem; }

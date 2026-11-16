@@ -28,6 +28,7 @@ trabajando a turnos. Se abre en **HOY** y te dice exactamente qué toca.
 | `js/frases.js` + `frases.json` | Frase motivadora del día (edita `frases.json` para añadir/quitar) |
 | `js/temporizador.js` | Temporizador pomodoro (se recupera si se cierra la app) |
 | `js/bienvenida.js` | Asistente de la primera vez |
+| `js/resumen.js` | Resumen de la semana anterior y pasar pendientes |
 | `fuentes/` | Tipografías incluidas (Bricolage Grotesque e Inter, licencia OFL) |
 | `js/pantallas/*.js` | Una archivo por pantalla: hoy, semana, calendario, progreso, ajustes |
 | `sw.js` | Funcionamiento sin conexión (⚠ sube `VERSION` al publicar cambios) |

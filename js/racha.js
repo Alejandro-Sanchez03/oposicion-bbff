@@ -9,6 +9,7 @@
 import { datos, guardar, nuevoId } from './db.js';
 import { ajustes } from './ajustes.js';
 import { hoyISO, sumarDias, inicioSemanaAcademia, diferenciaDias } from './fechas.js';
+import { tipoDia } from './turnos.js';
 
 /** Minutos estudiados un día (suma de sesiones). */
 export function minutosDelDia(iso) {
@@ -38,7 +39,7 @@ export function comodinDisponible(iso) {
 
 /**
  * Estado de un día para el calendario de racha:
- * 'cumplido' | 'comodin' | 'fallado' | 'hoy' (aún en juego) | 'futuro' | 'antes' (antes de empezar)
+ * 'cumplido' | 'comodin' | 'pausa' (vacaciones/baja) | 'fallado' | 'hoy' (aún en juego) | 'futuro' | 'antes' (antes de empezar)
  */
 export function estadoDia(iso) {
   const hoy = hoyISO();
@@ -47,6 +48,7 @@ export function estadoDia(iso) {
   if (iso < inicio) return 'antes';
   if (cumplido(iso)) return 'cumplido';
   if (usoComodin(iso)) return 'comodin';
+  if (tipoDia(iso) === 'pausa') return 'pausa';
   return iso === hoy ? 'hoy' : 'fallado';
 }
 
@@ -56,7 +58,7 @@ export function rachaActual() {
   for (let f = hoyISO(); ; f = sumarDias(f, -1)) {
     const e = estadoDia(f);
     if (e === 'cumplido') racha++;
-    else if (e === 'comodin' || e === 'hoy') continue;
+    else if (e === 'comodin' || e === 'pausa' || e === 'hoy') continue;
     else break; // 'fallado' o 'antes'
   }
   return racha;
@@ -81,7 +83,7 @@ export function mejorRacha() {
 export function diaParaComodin() {
   for (let f = sumarDias(hoyISO(), -1); diferenciaDias(f, hoyISO()) <= 7; f = sumarDias(f, -1)) {
     const e = estadoDia(f);
-    if (e === 'cumplido' || e === 'comodin') continue;
+    if (e === 'cumplido' || e === 'comodin' || e === 'pausa') continue;
     if (e === 'fallado' && comodinDisponible(f)) return f;
     return null;
   }
