@@ -3,7 +3,9 @@
 // Las pantallas se eligen con la parte de la dirección después de "#":
 //   #/hoy  #/semana  #/calendario  #/progreso  #/ajustes
 // =====================================================================
-import { cargarTodo } from './db.js';
+import { cargarTodo, alCambiar } from './db.js';
+import { configSync, sincronizar } from './sync.js';
+import { toast } from './ui.js';
 import { inicializarSiHaceFalta, aplicarTema, ajustes, cambiarAjustes } from './ajustes.js';
 import { recolocarAtrasadas } from './guia.js';
 import { cargarFrases } from './frases.js';
@@ -16,7 +18,7 @@ import * as progreso from './pantallas/progreso.js';
 import * as pantallaAjustes from './pantallas/ajustes.js';
 
 // Cambia este número cada vez que publiques una versión nueva (y también en sw.js).
-window.VERSION_APP = '1.3.0';
+window.VERSION_APP = '1.4.0';
 
 const PANTALLAS = { hoy, semana, calendario, progreso, ajustes: pantallaAjustes };
 
@@ -35,8 +37,37 @@ function pantallaActual() {
 async function refrescar() {
   const nombre = pantallaActual();
   document.querySelectorAll('.nav a').forEach((a) => a.classList.toggle('activo', a.dataset.pantalla === nombre));
-  await PANTALLAS[nombre].render(document.getElementById('pantalla'), app);
+  const contenedor = document.getElementById('pantalla');
+  contenedor.className = `pantalla-${nombre}`; // permite estilos por pantalla (p. ej. en el PC)
+  await PANTALLAS[nombre].render(contenedor, app);
 }
+
+// ---- Sincronización entre dispositivos (si está configurada en Ajustes) ----
+let temporizadorSync = null;
+let errorAvisado = false;
+async function sincronizarAhora() {
+  clearTimeout(temporizadorSync);
+  if (!configSync()) return;
+  try {
+    const r = await sincronizar();
+    errorAvisado = false;
+    if (r && r.cambiosLocales) {
+      // Hay datos nuevos de otro dispositivo: se vuelve a dibujar (salvo si estás en mitad de algo).
+      if (!document.querySelector('dialog[open], .temporizador, .bienvenida, .fantasma')) refrescar();
+      toast('🔄 Datos actualizados desde otro dispositivo');
+    }
+  } catch (e) {
+    console.warn('Sincronización:', e.message);
+    if (!errorAvisado) { errorAvisado = true; toast(`⚠ No se pudo sincronizar: ${e.message}`); }
+  }
+}
+/** Tras un cambio, sincroniza a los pocos segundos (agrupa varios cambios seguidos). */
+function programarSync() {
+  if (!configSync()) return;
+  clearTimeout(temporizadorSync);
+  temporizadorSync = setTimeout(sincronizarAhora, 4000);
+}
+app.sincronizarAhora = sincronizarAhora;
 
 /** Una vez al día: recolocar tareas atrasadas. */
 async function revisionDiaria() {
@@ -54,6 +85,14 @@ async function arrancar() {
   if (hayQueMostrarBienvenida()) await mostrarBienvenida();
   await refrescar();
   hoy.reanudarTemporizador(app); // si se cerró la app con el temporizador en marcha
+
+  // Sincronización: al abrir, tras cada cambio, al volver a la app, al salir y al recuperar conexión.
+  alCambiar(programarSync);
+  sincronizarAhora();
+  window.addEventListener('online', sincronizarAhora);
+  document.addEventListener('visibilitychange', () => {
+    if (configSync()) sincronizarAhora(); // al volver: traer cambios; al salir: subir los pendientes
+  });
 
   window.addEventListener('hashchange', () => { window.scrollTo(0, 0); refrescar(); });
   // Enlaces internos con data-ir="semana" etc.

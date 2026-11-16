@@ -158,7 +158,7 @@ function vistaSemana(s, hoy) {
       </div>
     </section>
 
-    ${rangoFechas(s.inicio, s.fin).map((f) => vistaDia(f, tareas, s, hoy)).join('')}
+    <div class="dias-semana">${rangoFechas(s.inicio, s.fin).map((f) => vistaDia(f, tareas, s, hoy)).join('')}</div>
 
     ${sinDia.length ? `<section class="dia sin-hueco" data-fecha=""><h3>Sin hueco esta semana (${sinDia.length})</h3>
       ${sinDia.map((t) => filaTarea(t, s)).join('')}</section>` : ''}

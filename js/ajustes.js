@@ -56,9 +56,17 @@ export function ajustes() {
   };
 }
 
+/**
+ * Ajustes que son de CADA dispositivo y no se sincronizan
+ * (p. ej. el modo oscuro puede ser distinto en el PC y en la tablet).
+ */
+export const AJUSTES_LOCALES = ['tema', 'ultimaRevision', 'fraseHoy', 'frasesUsadas'];
+
 /** Cambia uno o varios ajustes. Ej: cambiarAjustes({ minutosTurno: 60 }) */
 export async function cambiarAjustes(cambios) {
-  await guardar('ajustes', { ...ajustes(), ...cambios });
+  // Si solo cambian ajustes locales, no cuenta como cambio para sincronizar.
+  const soloLocales = Object.keys(cambios).every((k) => AJUSTES_LOCALES.includes(k));
+  await guardar('ajustes', { ...ajustes(), ...cambios }, { marcar: !soloLocales });
 }
 
 /** Prepara la app la primera vez que se abre. */

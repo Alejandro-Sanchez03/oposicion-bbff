@@ -28,9 +28,28 @@ La app se publica gratis con **GitHub Pages**. Desde el ordenador o desde el nav
 
 Repite en el móvil si quieres tenerla también allí.
 
-> ⚠ **Tablet y móvil NO se sincronizan solos** (no hay servidor). Usa uno como principal.
-> Para pasar los datos de uno a otro: en el principal **Ajustes → Exportar copia**,
-> envíate el archivo (WhatsApp, correo, Drive…) y en el otro **Ajustes → Importar copia**.
+### En el PC (Windows o Mac)
+1. Abre **Google Chrome** o **Microsoft Edge** y entra en la misma dirección.
+2. En la barra de direcciones, a la derecha, pulsa el icono **Instalar** (un monitor con una flecha)
+   → **Instalar**. Se abrirá en su propia ventana y tendrás un acceso directo.
+   En pantalla grande verás el menú a la izquierda y la semana entera en columnas.
+
+### Tener los mismos datos en la tablet, el móvil y el PC
+La app guarda una copia en un archivo privado de **tu cuenta de GitHub** (un «gist»). Gratis.
+1. **Consigue la clave (una sola vez)** desde el PC:
+   1. Entra en **github.com/settings/tokens/new**.
+   2. En *Note* escribe «Oposición BF» y en *Expiration* elige **No expiration**.
+   3. Marca **solo** la casilla **gist** y pulsa **Generate token**.
+   4. Copia la clave (empieza por `ghp_`) y **guárdala** en tus notas: GitHub solo la enseña una vez.
+2. En el dispositivo donde ya tienes tus datos (la tablet): **Ajustes → Sincronizar entre dispositivos**,
+   pega la clave y pulsa **Conectar este dispositivo**.
+3. En cada dispositivo nuevo (PC, móvil): al abrir la app por primera vez pulsa
+   **«¿Ya usas la app en otro dispositivo?»**, pega la **misma clave** y elige **Usar los de la nube**.
+4. Listo: se sincroniza sola al abrir la app, al volver a ella y unos segundos después de cada cambio.
+   Sin internet sigue funcionando; se pone al día cuando vuelve la conexión.
+
+> El modo claro/oscuro es de cada dispositivo (puedes tener el PC en oscuro y la tablet en claro).
+> Si alguna vez cambias lo mismo en dos dispositivos sin conexión, se queda el cambio más reciente.
 
 ## 3. Primeros pasos dentro de la app
 

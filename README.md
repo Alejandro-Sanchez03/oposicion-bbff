@@ -4,7 +4,8 @@ App web para organizar el estudio de la oposición de **Bombero Forestal (Comuni
 trabajando a turnos. Se abre en **HOY** y te dice exactamente qué toca.
 
 - Funciona **sin internet** una vez instalada.
-- **Sin cuentas ni servidor**: los datos se guardan solo en tu dispositivo.
+- **Sin cuentas ni servidor**: los datos se guardan en tu dispositivo. Opcionalmente se sincronizan
+  entre dispositivos (tablet, móvil, PC) con un gist privado de tu cuenta de GitHub.
 - Instalable en Android (tablet y móvil) como si fuera una app.
 
 👉 **Instrucciones de instalación y actualización:** [docs/INSTRUCCIONES.md](docs/INSTRUCCIONES.md)
@@ -29,6 +30,7 @@ trabajando a turnos. Se abre en **HOY** y te dice exactamente qué toca.
 | `js/temporizador.js` | Temporizador pomodoro (se recupera si se cierra la app) |
 | `js/bienvenida.js` | Asistente de la primera vez |
 | `js/resumen.js` | Resumen de la semana anterior y pasar pendientes |
+| `js/sync.js` | Sincronización entre dispositivos con un gist privado de GitHub (gana el cambio más reciente) |
 | `fuentes/` | Tipografías incluidas (Bricolage Grotesque e Inter, licencia OFL) |
 | `js/pantallas/*.js` | Una archivo por pantalla: hoy, semana, calendario, progreso, ajustes |
 | `sw.js` | Funcionamiento sin conexión (⚠ sube `VERSION` al publicar cambios) |

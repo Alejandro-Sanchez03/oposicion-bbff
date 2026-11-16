@@ -29,7 +29,8 @@ export function mostrarBienvenida() {
         <p>Esta app decide por ti qué toca cada día según tus <b>turnos</b>.
           Tú solo tienes que abrirla y pulsar <b>Empezar</b>.</p>
         <label class="campo"><span>¿Sabes la fecha del examen? (opcional)</span>
-          <input type="date" name="examen" value="${r.examen}"></label>`,
+          <input type="date" name="examen" value="${r.examen}"></label>
+        <button type="button" class="bv-enlace" data-acc="ya-uso">¿Ya usas la app en otro dispositivo? <b>Conectar y traer tus datos →</b></button>`,
       () => `
         <div class="bv-emoji">📅</div>
         <h1>Tus turnos</h1>
@@ -79,6 +80,13 @@ export function mostrarBienvenida() {
       e.preventDefault();
       leer();
       if (acc === 'atras') { paso--; pintar(); }
+      if (acc === 'ya-uso') {
+        await cambiarAjustes({ bienvenidaHecha: true });
+        capa.remove();
+        location.hash = '#/ajustes';
+        resolver();
+        return;
+      }
       if (acc === 'siguiente') { paso++; pintar(); }
       if (acc === 'fin') {
         await cambiarAjustes({
