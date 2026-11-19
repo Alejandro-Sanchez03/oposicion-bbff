@@ -10,7 +10,7 @@ import { ajustes, cambiarAjustes } from '../ajustes.js';
 import { hoyISO, textoCorto, sumarDias, deISO, diferenciaDias, DIAS, MESES } from '../fechas.js';
 import { tipoDia, capacidadDia } from '../turnos.js';
 import {
-  tareasDelDia, semanaDe, NOMBRE_TIPO, ICONO_TIPO, TIPOS_CON_NOTA, moverTarea, hoyNoPuedo,
+  tareasDelDia, semanaDe, NOMBRE_TIPO, ICONO_TIPO, TIPOS_CON_NOTA, moverTarea, hoyNoPuedo, marcarTareaHecha,
 } from '../guia.js';
 import { ordenarTareasDelDia } from '../reparto.js';
 import {
@@ -243,6 +243,7 @@ function tarjetaTarea(t, esSiguiente) {
         ${t.minimo ? '<span class="chip">mínimos</span>' : ''}
         ${!t.obligatoria ? '<span class="chip">opcional</span>' : ''}
         ${t.recolocadaDesde ? `<span class="chip">viene del ${textoCorto(t.recolocadaDesde)}</span>` : ''}
+        ${t.rescate ? `<span class="chip atrasado">📚 atrasado${t.origenSemana ? ` · semana del ${textoCorto(t.origenSemana)}` : ''}</span>` : ''}
       </div>
     </div>
     <div class="tarea-botones">
@@ -270,7 +271,7 @@ async function marcarHecha(tarea, boton, app) {
   const hoy = hoyISO();
   const hecha = tarea.estado !== 'hecha';
   const antes = cumplido(hoy);
-  await guardar('tareas', { ...tarea, estado: hecha ? 'hecha' : 'pendiente', hechaEn: hecha ? hoy : null });
+  await marcarTareaHecha(tarea, hecha);
   if (!hecha) { app.refrescar(); return; }
   celebrar(boton);
   if (!antes && cumplido(hoy)) setTimeout(() => celebrar(), 350);
@@ -278,7 +279,7 @@ async function marcarHecha(tarea, boton, app) {
   app.refrescar();
   toast('¡Hecha! 💪', {
     boton: 'Deshacer',
-    alPulsar: async () => { await guardar('tareas', tarea); app.refrescar(); },
+    alPulsar: async () => { await marcarTareaHecha(tarea, false); app.refrescar(); },
   });
 }
 
@@ -319,7 +320,7 @@ async function cerrarSesion(minutos, tarea, app) {
   if (res && res.proximo) await cambiarAjustes({ proximo: res.proximo, proximoFecha: hoy });
   if (res && tarea && res.hecha) {
     const t = datos.tareas.find((x) => x.uid === tarea.uid);
-    await guardar('tareas', { ...t, estado: 'hecha', hechaEn: hoy });
+    await marcarTareaHecha(t, true);
     celebrar();
     if (TIPOS_CON_NOTA.includes(t.tipo)) await pedirNota(t);
   }

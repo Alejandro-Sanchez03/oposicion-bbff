@@ -5,7 +5,7 @@
 import { datos, guardar } from './db.js';
 import { hoyISO, rangoFechas, diferenciaDias } from './fechas.js';
 import { estadoDia, minutosDelDia } from './racha.js';
-import { repartirSemana, semanaDe } from './guia.js';
+import { recuperarEstaSemana } from './atrasado.js';
 
 /** La última semana ya terminada (hace 7 días como mucho) cuyo resumen no has cerrado. */
 export function semanaParaResumen() {
@@ -34,32 +34,15 @@ export function resumenDe(semana) {
 }
 
 /**
- * Copia las tareas pendientes de una semana a la semana actual (como opcionales:
- * la guía nueva manda) y vuelve a repartir. Devuelve cuántas se han pasado.
+ * Pasa las tareas pendientes de una semana a la semana actual (como "atrasado
+ * que recuperas": van detrás de lo obligatorio de la guía nueva).
+ * Devuelve cuántas se han pasado.
  */
 export async function pasarPendientes(semanaVieja) {
-  const nueva = semanaDe(hoyISO());
-  if (!nueva) return 0;
-  const pendientes = resumenDe(semanaVieja).pendientes;
-  const maxOrden = Math.max(0, ...datos.tareas.filter((t) => t.semanaId === nueva.id).map((t) => t.orden));
-  const copias = pendientes.map((t, i) => ({
-    ...t,
-    uid: `${nueva.id}_atrasada_${t.uid}`,
-    semanaId: nueva.id,
-    id: `atrasada_${t.id}`,
-    titulo: `${t.titulo} (de la semana pasada)`,
-    obligatoria: false,
-    minimo: false,
-    dia_sugerido: null,
-    dia_asignado: null,
-    fijada: false,
-    recolocadaDesde: null,
-    orden: maxOrden + 1 + i,
-  }));
-  await guardar('tareas', copias);
+  const pendientes = resumenDe(semanaVieja).pendientes.filter((t) => t.estado !== 'descartada' && !t.rescate);
+  const r = await recuperarEstaSemana(pendientes.map((t) => t.uid));
   await guardar('semanas', { ...semanaVieja, resumenVisto: true });
-  await repartirSemana(nueva.id);
-  return copias.length;
+  return r.ok ? r.total : 0;
 }
 
 export async function cerrarResumen(semana) {

@@ -8,6 +8,7 @@ import { configSync, sincronizar } from './sync.js';
 import { toast } from './ui.js';
 import { inicializarSiHaceFalta, aplicarTema, ajustes, cambiarAjustes } from './ajustes.js';
 import { recolocarAtrasadas } from './guia.js';
+import { actualizarRecuperacion } from './atrasado.js';
 import { cargarFrases } from './frases.js';
 import { hoyISO } from './fechas.js';
 import * as hoy from './pantallas/hoy.js';
@@ -18,7 +19,7 @@ import * as progreso from './pantallas/progreso.js';
 import * as pantallaAjustes from './pantallas/ajustes.js';
 
 // Cambia este número cada vez que publiques una versión nueva (y también en sw.js).
-window.VERSION_APP = '1.4.0';
+window.VERSION_APP = '1.5.0';
 
 const PANTALLAS = { hoy, semana, calendario, progreso, ajustes: pantallaAjustes };
 
@@ -73,6 +74,7 @@ app.sincronizarAhora = sincronizarAhora;
 async function revisionDiaria() {
   if (ajustes().ultimaRevision === hoyISO()) return;
   app.avisosHoy = await recolocarAtrasadas();
+  await actualizarRecuperacion(); // rellena huecos con lo atrasado (si está activado)
   await cambiarAjustes({ ultimaRevision: hoyISO() });
 }
 

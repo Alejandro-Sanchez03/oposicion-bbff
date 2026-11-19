@@ -6,14 +6,17 @@ import { hoyISO, textoCorto, rangoFechas, sumarDias } from '../fechas.js';
 import { tipoDia, capacidadDia } from '../turnos.js';
 import {
   validarGuia, importarGuia, repartirSemana, moverTarea, minutosOcupados,
-  semanaDe, ejemploGuia, NOMBRE_TIPO, ICONO_TIPO, instruccionesIA,
+  semanaDe, ejemploGuia, NOMBRE_TIPO, ICONO_TIPO, instruccionesIA, marcarTareaHecha,
 } from '../guia.js';
 import { ordenarTareasDelDia } from '../reparto.js';
+import { renderAtrasado } from './atrasado-vista.js';
+import { atrasadas, actualizarRecuperacion } from '../atrasado.js';
 import { esc, dialogo, confirmar, toast, avisar } from '../ui.js';
 import { ajustes, cambiarAjustes } from '../ajustes.js';
 import { textoCorto as corto } from '../fechas.js';
 
 let semanaVista = null; // id de la semana que se está viendo
+let pestanaSemana = 'semana'; // 'semana' o 'atrasado'
 
 export function render(cont, app) {
   const hoy = hoyISO();
@@ -22,10 +25,25 @@ export function render(cont, app) {
     semanaVista = (semanaDe(hoy) || semanas.find((s) => s.inicio > hoy) || semanas[0] || {}).id || null;
   }
   const s = semanas.find((x) => x.id === semanaVista);
-
-  cont.innerHTML = `
+  const nAtrasadas = atrasadas().length;
+  const cabecera = `
     <p class="antetitulo">Guía de la academia</p>
     <h1>Semana</h1>
+    <div class="pestanas">
+      <button class="pestana ${pestanaSemana === 'semana' ? 'activa' : ''}" data-pestana="semana">🗓️ Semana</button>
+      <button class="pestana ${pestanaSemana === 'atrasado' ? 'activa' : ''}" data-pestana="atrasado">📚 Atrasado${nAtrasadas ? ` <span class="contador">${nAtrasadas}</span>` : ''}</button>
+    </div>`;
+  // Cambiar de pestaña (se engancha una sola vez)
+  if (!cont.dataset.pestanas) {
+    cont.dataset.pestanas = '1';
+    cont.addEventListener('click', (e) => {
+      const p = e.target.closest('[data-pestana]');
+      if (p && location.hash.startsWith('#/semana')) { pestanaSemana = p.dataset.pestana; app.refrescar(); }
+    });
+  }
+  if (pestanaSemana === 'atrasado') { renderAtrasado(cont, app, cabecera); return; }
+
+  cont.innerHTML = `${cabecera}
     <label class="subir-pdf">
       <span class="subir-pdf-icono">📄</span>
       <span><b>Subir el PDF de la academia</b><small>La app lo lee y reparte la semana. Gratis y sin internet.</small></span>
@@ -100,8 +118,7 @@ export function render(cont, app) {
       if (dia !== null) { await moverTarea(t.uid, dia || null); app.refrescar(); }
     }
     if (acc === 'hecha' && t) {
-      const hecha = t.estado !== 'hecha';
-      await guardar('tareas', { ...t, estado: hecha ? 'hecha' : 'pendiente', hechaEn: hecha ? hoy : null });
+      await marcarTareaHecha(t, t.estado !== 'hecha');
       app.refrescar();
     }
     if (acc === 'soltar' && t) {
@@ -254,6 +271,8 @@ async function importarValidada(guia) {
       ${sem.plan_minimo ? `La academia propone: <i>${esc(sem.plan_minimo)}</i><br><br>` : ''}¿Aplico el plan de mínimos?`, 'Aplicar plan de mínimos', 'Ahora no');
     if (ok) { await guardar('semanas', { ...sem, modoMinimos: true }); await repartirSemana(sem.id); }
   }
+  // Si recuperas lo atrasado automáticamente, se rellenan los huecos de la semana nueva.
+  await actualizarRecuperacion({ completo: true });
   return guia.semana.split(' a ')[0];
 }
 

@@ -163,6 +163,14 @@ export function diasDisponibles(semana, primerDia = hoyISO()) {
 export async function repartirSemana(semanaId, soloEstas = null, primerDia = hoyISO()) {
   const semana = datos.semanas.find((s) => s.id === semanaId);
   const tareas = datos.tareas.filter((t) => t.semanaId === semanaId);
+  // Semana ya pasada (p. ej. una guía antigua): cada tarea se queda en el día que puso la academia.
+  if (semana.fin < hoyISO()) {
+    const cambiadas = tareas.filter((t) => !t.dia_asignado && t.tipo !== 'clase')
+      .map((t) => ({ ...t, dia_asignado: t.dia_sugerido || semana.inicio }));
+    await guardar('tareas', cambiadas);
+    if (semana.avisos?.length) await guardar('semanas', { ...semana, avisos: [] });
+    return { asignacion: Object.fromEntries(tareas.map((t) => [t.uid, t.dia_asignado || t.dia_sugerido || semana.inicio])), avisos: [], noCabenObligatorias: [] };
+  }
   const resultado = repartir({
     tareas, dias: diasDisponibles(semana, primerDia), prioridad: semana.prioridad,
     modoMinimos: semana.modoMinimos, soloEstas,
@@ -261,6 +269,23 @@ Reglas:
 - Pon las tareas en el orden lógico de la guía (primero el estudio de un tema y después su test).
 - "id": t1, t2, t3... sin repetir.
 - Usa comillas rectas ("), nunca tipográficas.`;
+}
+
+/**
+ * Marca (o desmarca) una tarea como hecha.
+ * - Si es de una semana ya pasada, no cuenta para el mínimo de hoy (hechaEn = null).
+ * - Si es la copia de una tarea atrasada que estás recuperando, también marca la original.
+ */
+export async function marcarTareaHecha(tarea, hecha = true) {
+  const hoy = hoyISO();
+  const semana = datos.semanas.find((s) => s.id === tarea.semanaId);
+  const retro = semana && semana.fin < hoy;
+  const t = datos.tareas.find((x) => x.uid === tarea.uid) || tarea;
+  await guardar('tareas', { ...t, estado: hecha ? 'hecha' : 'pendiente', hechaEn: hecha && !retro ? hoy : null });
+  if (t.origenUid) {
+    const o = datos.tareas.find((x) => x.uid === t.origenUid);
+    if (o) await guardar('tareas', { ...o, estado: hecha ? 'hecha' : 'pendiente', hechaEn: null, recuperadaEn: hecha ? hoy : null });
+  }
 }
 
 /** Mueve una tarea a mano a otro día (queda "fijada": el reparto ya no la mueve). */

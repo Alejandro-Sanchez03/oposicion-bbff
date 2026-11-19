@@ -18,6 +18,8 @@
 //  6. Cada tarea va a su día sugerido si se puede; si no, al más cercano.
 //  7. Modo "plan de mínimos": las tareas marcadas `minimo` pasan a ser las
 //     importantes y el resto de obligatorias solo entran si sobra hueco.
+//  8. Lo ATRASADO que recuperas (tareas con `rescate: true`) va justo después
+//     de las obligatorias de la semana y antes de las opcionales.
 // =====================================================================
 
 /** Rango de cada tipo de tarea (para ordenar las tareas de un mismo día). */
@@ -140,11 +142,14 @@ export function repartir({ tareas, dias, prioridad = [], modoMinimos = false, so
 
   const movibles = tareas.filter(movible);
   const importantes = movibles.filter(esImportante);
-  const resto = movibles.filter((t) => !esImportante(t));
+  const rescate = movibles.filter((t) => !esImportante(t) && t.rescate).sort((a, b) => a.orden - b.orden);
+  const resto = movibles.filter((t) => !esImportante(t) && !t.rescate);
 
   // Importantes: primero pesadas, luego ligeras (así las ligeras no roban los días libres).
   importantes.filter(esPesada).sort(porSugerido).forEach(colocar);
   importantes.filter((t) => !esPesada(t)).sort(porSugerido).forEach(colocar);
+  // Atrasado que se recupera: en el orden en que se eligió (lo más antiguo primero).
+  rescate.forEach(colocar);
   // Resto: por orden de prioridad, solo si queda hueco.
   resto.filter(esPesada).sort(porPrioridad).forEach(colocar);
   resto.filter((t) => !esPesada(t)).sort(porPrioridad).forEach(colocar);

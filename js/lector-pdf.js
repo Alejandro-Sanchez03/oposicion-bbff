@@ -128,7 +128,8 @@ function interpretar(texto) {
 /** Elige la fecha del viernes: el más cercano a hoy cuyo día del mes coincide con el de la tabla. */
 function fechaDelViernes(diaV, mesTexto, hoy) {
   let mejor = null;
-  for (let d = -60; d <= 60; d++) {
+  // Busca hasta ~1 año atrás (para cargar guías antiguas) y 2 meses adelante.
+  for (let d = -400; d <= 60; d++) {
     const f = sumarDias(hoy, d);
     if (diaSemana(f) !== 5 || deISO(f).getDate() !== diaV) continue;
     // Si el PDF nombra el mes, la semana tiene que tocar ese mes.

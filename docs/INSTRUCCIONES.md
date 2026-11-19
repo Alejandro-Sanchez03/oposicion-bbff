@@ -75,6 +75,14 @@ La app guarda una copia en un archivo privado de **tu cuenta de GitHub** (un «g
 - **Resumen de la semana**: el viernes, en **Hoy**, verás cómo fue la semana anterior y podrás
   **pasar lo pendiente** a la semana nueva (entra como opcional: la guía nueva manda).
 - **Progreso → Tiempo**: minutos estudiados por día y por semana.
+- **Lo atrasado** (Semana → pestaña **📚 Atrasado**):
+  - **Subir guías anteriores**: elige a la vez todos los PDF desde que empezaste.
+  - Toca **○** en lo que ya tengas estudiado (o «Todo esto ya lo tengo» para una semana entera),
+    **➕ Esta semana** para recuperar algo, o **✕** si no lo vas a hacer.
+  - **Mi consejo** te dice cuánto te falta y en cuántas semanas lo recuperas. Criterio: primero lo obligatorio
+    de la academia de esta semana; después lo obligatorio atrasado (lo más antiguo primero) en tus huecos;
+    lo opcional, solo si vas sobrado.
+  - Activa **«Recuperar lo obligatorio automáticamente en mis huecos»** y la app lo irá metiendo sola.
 
 ## 4. Copias de seguridad
 

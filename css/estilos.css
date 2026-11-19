@@ -401,6 +401,24 @@ span.fila-pdf-min { color: var(--texto-suave); }
   border: 2px solid var(--primario); border-radius: 14px; padding: 6px 10px; box-shadow: 0 16px 40px rgb(0 0 0 / 0.3); }
 .dia.soltar-aqui { border: 2px dashed var(--primario); background: var(--acento-suave); }
 
+/* Atrasado */
+.pestana .contador { display: inline-block; min-width: 22px; padding: 0 6px; border-radius: 999px; font-size: 0.78rem;
+  background: var(--primario); color: #fff; margin-left: 4px; }
+.consejo { background: var(--info-fondo); border-left: 5px solid var(--info-borde); border-radius: 16px; padding: 14px 16px; margin: 14px 0; }
+.consejo.ok { background: var(--libre-fondo); border-color: var(--libre); }
+.consejo > b { font-family: var(--titulos); font-size: 1.15rem; }
+.interruptor { display: flex; gap: 12px; align-items: flex-start; margin-top: 10px; padding: 12px; border-radius: 12px;
+  background: var(--tarjeta); border: 1px solid var(--borde); cursor: pointer; }
+.interruptor input { width: 26px; min-height: 26px; flex: none; accent-color: var(--primario); margin: 2px 0 0; }
+.interruptor small { display: block; }
+.subir-varias { cursor: pointer; margin-bottom: 4px; }
+.fila-atrasada { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--borde); }
+.fila-atrasada .fila-tarea-texto { flex: 1 1 200px; }
+.fila-atrasada-acciones { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; margin-left: auto; }
+.fila-atrasada.descartada { opacity: 0.6; }
+.chip.recuperando { background: var(--libre-fondo); color: var(--libre-texto); border-color: transparent; padding: 4px 10px; }
+.chip.atrasado { background: var(--info-fondo); border-color: transparent; }
+
 /* =====================================================================
    CALENDARIO
    ===================================================================== */
