@@ -490,6 +490,42 @@ h3 + .fila-tema { border-top: 0; }
 .tooltip { position: absolute; background: var(--texto); color: var(--fondo); padding: 4px 10px; border-radius: 8px;
   font-size: 0.85rem; white-space: nowrap; pointer-events: none; }
 
+/* Temario y notas */
+.acciones-temario { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 4px; }
+.acciones-temario label { cursor: pointer; }
+button.nombre-tema { background: none; border: 0; padding: 6px 0; text-align: left; font: inherit; font-weight: 650;
+  color: var(--texto); cursor: pointer; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.chip-nota { display: inline-block; font-size: 0.8rem; font-weight: 800; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+.chip-nota.bien { background: var(--libre-fondo); color: var(--libre-texto); }
+.chip-nota.regular { background: var(--aviso-fondo); color: var(--aviso-borde); }
+.chip-nota.mal { background: var(--peligro-fondo); color: var(--peligro); }
+.reforzar { border: 2px solid var(--aviso-borde); }
+.grupo-temario { padding: 0; }
+.grupo-temario > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer;
+  padding: 16px 18px; list-style: none; font-family: var(--titulos); font-weight: 700; font-size: 1.1rem; }
+.grupo-temario > summary::-webkit-details-marker { display: none; }
+.grupo-temario > summary::after { content: '▾'; color: var(--texto-suave); transition: transform 0.2s; }
+.grupo-temario[open] > summary::after { transform: rotate(180deg); }
+.grupo-temario[open] > summary { border-bottom: 1px solid var(--borde); }
+.grupo-temario > .fila-tema { padding-left: 18px; padding-right: 18px; }
+.grupo-progreso { display: flex; align-items: center; gap: 8px; margin-left: auto; font-family: "Inter", sans-serif; font-size: 0.9rem; }
+.mini-barra { width: 60px; height: 6px; border-radius: 999px; background: var(--nada-fondo); overflow: hidden; display: inline-block; }
+.mini-barra i { display: block; height: 100%; background: var(--libre); }
+.fila-flojo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-top: 1px solid var(--borde); }
+.fila-flojo small { display: block; }
+.lista-notas { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.historial summary { cursor: pointer; padding: 4px 0; }
+.historial[open] summary { margin-bottom: 10px; }
+.nota-calculada { font-size: 1.05rem; }
+.nota-calculada b { font-family: var(--titulos); font-size: 1.3rem; }
+.vista-pdf.indice { max-height: 46vh; overflow: auto; }
+.fila-indice { display: flex; gap: 10px; align-items: center; padding: 6px 8px; border-radius: 10px; }
+.fila-indice:hover { background: var(--tarjeta-2); }
+.fila-indice input { width: 22px; min-height: 22px; flex: none; accent-color: var(--primario); }
+.fila-indice.nivel-1 { font-weight: 700; }
+.fila-indice.nivel-2 { padding-left: 28px; }
+.fila-indice.nivel-3 { padding-left: 52px; font-size: 0.92rem; color: var(--texto-suave); }
+
 /* =====================================================================
    BIENVENIDA (primera vez)
    ===================================================================== */

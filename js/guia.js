@@ -6,6 +6,7 @@ import { ajustes } from './ajustes.js';
 import { tipoDia, capacidadDia } from './turnos.js';
 import { esFechaValida, hoyISO, inicioSemanaAcademia, rangoFechas, sumarDias, textoCorto } from './fechas.js';
 import { repartir } from './reparto.js';
+import { temasDesdeGuias, actualizarEstadoTema } from './temario.js';
 
 export const TIPOS = ['estudio', 'test', 'autoevaluacion', 'repaso', 'psicotecnico', 'clase'];
 export const NOMBRE_TIPO = {
@@ -143,6 +144,7 @@ export async function importarGuia(guia) {
     modoMinimos: false, avisos: [], importada: new Date().toISOString(),
   });
   await guardar('tareas', nuevas);
+  await temasDesdeGuias(); // los temas nuevos de la guía pasan al temario
   return repartirSemana(semanaId);
 }
 
@@ -286,6 +288,7 @@ export async function marcarTareaHecha(tarea, hecha = true) {
     const o = datos.tareas.find((x) => x.uid === t.origenUid);
     if (o) await guardar('tareas', { ...o, estado: hecha ? 'hecha' : 'pendiente', hechaEn: null, recuperadaEn: hecha ? hoy : null });
   }
+  if (hecha) await actualizarEstadoTema(t.tema); // el temario se pone al día solo
 }
 
 /** Mueve una tarea a mano a otro día (queda "fijada": el reparto ya no la mueve). */

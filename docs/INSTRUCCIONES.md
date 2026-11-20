@@ -75,6 +75,13 @@ La app guarda una copia en un archivo privado de **tu cuenta de GitHub** (un «g
 - **Resumen de la semana**: el viernes, en **Hoy**, verás cómo fue la semana anterior y podrás
   **pasar lo pendiente** a la semana nueva (entra como opcional: la guía nueva manda).
 - **Progreso → Tiempo**: minutos estudiados por día y por semana.
+- **Progreso → Temario y notas**: el listado de todo lo que entra.
+  - Los temas de las guías se añaden solos, y su estado sube solo al hacer sus tareas (estudiado / repasado).
+  - **📄 Añadir temas desde un PDF**: sube el PEIF, un decreto, una ficha… y la app saca su índice
+    (apartados, anexos, capítulos) para que elijas cuáles añadir.
+  - **Notas de los tests**: apunta la nota del test del jueves (la app te lo pide el jueves por la noche),
+    de las autoevaluaciones o de simulacros. Cada tema muestra su última nota y en **⚠️ Para reforzar**
+    salen los que flojean, con un botón para meterles un repaso esta semana.
 - **Lo atrasado** (Semana → pestaña **📚 Atrasado**):
   - **Subir guías anteriores**: elige a la vez todos los PDF desde que empezaste.
   - Toca **○** en lo que ya tengas estudiado (o «Todo esto ya lo tengo» para una semana entera),

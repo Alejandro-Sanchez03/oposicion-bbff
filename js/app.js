@@ -9,6 +9,7 @@ import { toast } from './ui.js';
 import { inicializarSiHaceFalta, aplicarTema, ajustes, cambiarAjustes } from './ajustes.js';
 import { recolocarAtrasadas } from './guia.js';
 import { actualizarRecuperacion } from './atrasado.js';
+import { temasDesdeGuias } from './temario.js';
 import { cargarFrases } from './frases.js';
 import { hoyISO } from './fechas.js';
 import * as hoy from './pantallas/hoy.js';
@@ -19,7 +20,7 @@ import * as progreso from './pantallas/progreso.js';
 import * as pantallaAjustes from './pantallas/ajustes.js';
 
 // Cambia este número cada vez que publiques una versión nueva (y también en sw.js).
-window.VERSION_APP = '1.5.0';
+window.VERSION_APP = '1.6.0';
 
 const PANTALLAS = { hoy, semana, calendario, progreso, ajustes: pantallaAjustes };
 
@@ -84,6 +85,7 @@ async function arrancar() {
   aplicarTema();
   await cargarFrases();
   await revisionDiaria();
+  await temasDesdeGuias(); // por si hay guías cargadas antes de existir esta función
   if (hayQueMostrarBienvenida()) await mostrarBienvenida();
   await refrescar();
   hoy.reanudarTemporizador(app); // si se cerró la app con el temporizador en marcha

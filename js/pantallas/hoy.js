@@ -19,7 +19,7 @@ import {
 } from '../racha.js';
 import { fraseDeHoy, fraseRacha } from '../frases.js';
 import { abrirTemporizador, temporizadorGuardado } from '../temporizador.js';
-import { calcularNota } from './progreso.js';
+import { dialogoNota } from '../notas.js';
 import { exportar } from './ajustes.js';
 import { esc, dialogo, pedirTexto, toast, confirmar, celebrar } from '../ui.js';
 import { semanaParaResumen, resumenDe, pasarPendientes, cerrarResumen } from '../resumen.js';
@@ -110,6 +110,7 @@ export async function render(cont, app) {
     </section>
 
     ${tarjetaResumen(semana)}
+    ${tarjetaTestClase()}
 
     ${frase ? `<blockquote class="frase"><p>${esc(frase)}</p>${textoRacha ? `<span>${esc(textoRacha)}</span>` : ''}</blockquote>` : ''}
 
@@ -184,6 +185,16 @@ export async function render(cont, app) {
     }
     if (acc === 'adelantar') await adelantar(app);
     if (acc === 'copia') { await exportar(); app.refrescar(); }
+    if (acc === 'nota-clase' || acc === 'nota-clase-no') {
+      if (acc === 'nota-clase') {
+        const sem = datos.semanas.find((x) => x.id === tarea.semanaId);
+        const n = /(\d+)\s*preguntas/i.exec(tarea.titulo);
+        const guardado = await dialogoNota({ tema: sem?.prioridad?.[0] || '', fecha: tarea.dia_asignado, titulo: `✍️ ${tarea.titulo}`, tareaUid: tarea.uid, preguntas: n ? Number(n[1]) : null });
+        if (!guardado) return;
+      }
+      await guardar('tareas', { ...datos.tareas.find((x) => x.uid === tarea.uid), notaPedida: true });
+      app.refrescar();
+    }
     if (acc === 'resumen-cerrar') { await cerrarResumen(semanaParaResumen()); app.refrescar(); }
     if (acc === 'resumen-pasar') {
       const n = await pasarPendientes(semanaParaResumen());
@@ -285,23 +296,25 @@ async function marcarHecha(tarea, boton, app) {
 
 /** Al terminar un test: apuntar la nota en el momento. */
 async function pedirNota(tarea) {
-  const r = await dialogo(`
-    <h3>✍️ ¿Qué tal el test?</h3>
-    <p class="ayuda">${esc(tarea.titulo)} · se guardará en Progreso → Tests</p>
-    <div class="tres-columnas">
-      <label class="campo"><span>Aciertos</span><input type="number" name="ac" min="0" inputmode="numeric"></label>
-      <label class="campo"><span>Fallos</span><input type="number" name="fa" min="0" inputmode="numeric" value="0"></label>
-      <label class="campo"><span>En blanco</span><input type="number" name="bl" min="0" inputmode="numeric" value="0"></label>
-    </div>`,
-  [{ texto: 'Ahora no', valor: false }, { texto: 'Guardar nota', valor: true, clase: 'primario' }],
-  (form, ok) => (ok && form.ac.value !== '' ? { ac: Number(form.ac.value), fa: Number(form.fa.value) || 0, bl: Number(form.bl.value) || 0 } : null));
-  if (!r) return;
-  const nota = calcularNota(r.ac, r.fa, r.bl);
-  await guardar('tests', {
-    id: nuevoId(), fecha: hoyISO(), tema: tarea.tema, aciertos: r.ac, fallos: r.fa, blanco: r.bl,
-    nota, creado: new Date().toISOString(), tareaUid: tarea.uid,
-  });
-  toast(`Nota guardada: ${nota.toFixed(2)}`);
+  const n = /(\d+)\s*preguntas/i.exec(tarea.titulo);
+  await dialogoNota({ tema: tarea.tema, titulo: `✍️ ¿Qué tal «${tarea.titulo}»?`, tareaUid: tarea.uid, preguntas: n ? Number(n[1]) : null });
+}
+
+/** El test de clase del jueves ya pasó y no has apuntado la nota. */
+function testDeClasePendiente() {
+  const hoy = hoyISO();
+  const tarde = new Date().getHours() >= 20;
+  return datos.tareas.find((t) => t.tipo === 'clase' && /test|examen/i.test(t.titulo) && !t.notaPedida && t.dia_asignado &&
+    (t.dia_asignado < hoy || (t.dia_asignado === hoy && tarde)) && diferenciaDias(t.dia_asignado, hoy) <= 7) || null;
+}
+
+function tarjetaTestClase() {
+  const t = testDeClasePendiente();
+  if (!t) return '';
+  return `<div class="aviso info"><p>✍️ <b>¿Qué tal el ${esc(t.titulo.toLowerCase())}</b> del ${textoCorto(t.dia_asignado)}?
+    Apunta la nota: así verás qué temas flojean.</p>
+    <div class="fila-botones"><button class="boton pequeno primario" data-acc="nota-clase" data-uid="${t.uid}">Apuntar nota</button>
+    <button class="boton pequeno" data-acc="nota-clase-no" data-uid="${t.uid}">No lo hice</button></div></div>`;
 }
 
 /** Al terminar el temporizador: guarda el tiempo y pregunta por dónde vas. */

@@ -5,21 +5,19 @@ import { datos, guardar, borrar, nuevoId } from '../db.js';
 import { ajustes } from '../ajustes.js';
 import { hoyISO, textoCorto, sumarDias, inicioSemanaAcademia, rangoFechas, deISO } from '../fechas.js';
 import { minutosDelDia, rachaActual, mejorRacha } from '../racha.js';
-import { esc, confirmar, dialogo, toast } from '../ui.js';
+import { esc, confirmar, dialogo, toast, avisar } from '../ui.js';
+import { semanaDe, repartirSemana } from '../guia.js';
+import { dialogoNota, calcularNota } from '../notas.js';
+import { normalizar, grupoPara, notasDe, resumenNotas, temasFlojos } from '../temario.js';
+
+export { calcularNota };
 
 let pestana = 'estudio';
 let temaGrafica = '__todos';
+const gruposAbiertos = new Set(); // grupos del temario desplegados
 
 // Colores de las líneas de la gráfica (uno fijo por tema, siempre en el mismo orden).
 const COLORES = ['--serie-1', '--serie-2', '--serie-3', '--serie-4', '--serie-5', '--serie-6', '--serie-7', '--serie-8'];
-
-/** Nota sobre 10 con penalización: (aciertos − fallos/N) / total × 10. */
-export function calcularNota(aciertos, fallos, blanco, penalizacion = ajustes().penalizacion) {
-  const total = aciertos + fallos + blanco;
-  if (!total) return 0;
-  const netos = aciertos - (penalizacion > 0 ? fallos / penalizacion : 0);
-  return Math.max(0, Math.round((netos / total) * 1000) / 100);
-}
 
 /** Temas que aparecen en tests, en orden de aparición (así cada tema conserva su color). */
 function temasDeTests() {
@@ -31,97 +29,21 @@ function temasDeTests() {
 }
 
 export function render(cont, app) {
+  if (pestana === 'tests') pestana = 'temario';
   cont.innerHTML = `
-    <p class="antetitulo">Tiempo, tests y temario</p>
+    <p class="antetitulo">Tiempo, temario y notas</p>
     <h1>Progreso</h1>
     <div class="pestanas">
       <button class="pestana ${pestana === 'estudio' ? 'activa' : ''}" data-pest="estudio">⏱️ Tiempo</button>
-      <button class="pestana ${pestana === 'tests' ? 'activa' : ''}" data-pest="tests">📝 Tests</button>
-      <button class="pestana ${pestana === 'temario' ? 'activa' : ''}" data-pest="temario">📚 Temario</button>
+      <button class="pestana ${pestana === 'temario' ? 'activa' : ''}" data-pest="temario">📚 Temario y notas</button>
     </div>
     <div id="contenido-progreso"></div>`;
   const zona = cont.querySelector('#contenido-progreso');
-  if (pestana === 'estudio') renderEstudio(zona);
-  else if (pestana === 'tests') renderTests(zona, app);
-  else renderTemario(zona, app);
+  if (pestana === 'estudio') renderEstudio(zona); else renderTemario(zona, app);
 
   cont.querySelectorAll('[data-pest]').forEach((b) => b.addEventListener('click', () => {
     pestana = b.dataset.pest; app.refrescar();
   }));
-}
-
-// ---------------------------------------------------------------- TESTS
-function renderTests(zona, app) {
-  const temasSugeridos = [...new Set([...datos.temas.map((t) => t.nombre), ...datos.tests.map((t) => t.tema),
-    ...datos.tareas.map((t) => t.tema)])];
-  const tests = [...datos.tests].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.creado.localeCompare(a.creado));
-  const temas = temasDeTests();
-
-  zona.innerHTML = `
-    <form class="tarjeta form-test">
-      <h3>Apuntar un test</h3>
-      <div class="dos-columnas">
-        <label class="campo"><span>Fecha</span><input type="date" name="fecha" value="${hoyISO()}" required></label>
-        <label class="campo"><span>Tema</span><input name="tema" list="lista-temas" required placeholder="PEIF · Apartado 4"></label>
-      </div>
-      <datalist id="lista-temas">${temasSugeridos.map((t) => `<option value="${esc(t)}">`).join('')}</datalist>
-      <div class="tres-columnas">
-        <label class="campo"><span>Aciertos</span><input type="number" name="aciertos" min="0" inputmode="numeric" required></label>
-        <label class="campo"><span>Fallos</span><input type="number" name="fallos" min="0" inputmode="numeric" value="0"></label>
-        <label class="campo"><span>En blanco</span><input type="number" name="blanco" min="0" inputmode="numeric" value="0"></label>
-      </div>
-      <label class="campo"><span>Nota (sobre 10) — se calcula sola${ajustes().penalizacion ? `, cada ${ajustes().penalizacion} fallos restan 1 acierto` : ''}; puedes cambiarla</span>
-        <input type="number" name="nota" step="0.01" min="0" max="10" inputmode="decimal"></label>
-      <button class="boton primario ancho">Guardar test</button>
-    </form>
-
-    ${tests.length ? `
-      <section class="tarjeta">
-        <h3>Evolución de la nota</h3>
-        <select class="selector" data-acc="tema-grafica">
-          <option value="__todos">Todos los temas</option>
-          ${temas.map((t) => `<option ${t === temaGrafica ? 'selected' : ''}>${esc(t)}</option>`).join('')}
-        </select>
-        <div class="grafica-envoltorio">${grafica(temas)}</div>
-      </section>
-      <section class="tarjeta">
-        <h3>Tests apuntados (${tests.length})</h3>
-        <table class="tabla">
-          <thead><tr><th>Fecha</th><th>Tema</th><th>✓</th><th>✗</th><th>–</th><th>Nota</th><th></th></tr></thead>
-          <tbody>${tests.map((t) => `<tr>
-            <td>${textoCorto(t.fecha)}</td><td>${esc(t.tema)}</td><td>${t.aciertos}</td><td>${t.fallos}</td>
-            <td>${t.blanco}</td><td><b>${t.nota.toFixed(2)}</b></td>
-            <td><button class="boton icono" data-borrar="${t.id}" aria-label="Borrar">🗑</button></td></tr>`).join('')}
-          </tbody></table>
-      </section>` : '<p class="vacio">Aún no has apuntado ningún test.</p>'}`;
-
-  const form = zona.querySelector('.form-test');
-  const recalcular = () => {
-    const n = (k) => Number(form[k].value) || 0;
-    if (form.aciertos.value !== '') form.nota.value = calcularNota(n('aciertos'), n('fallos'), n('blanco')).toFixed(2);
-  };
-  ['aciertos', 'fallos', 'blanco'].forEach((k) => form[k].addEventListener('input', recalcular));
-
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const n = (k) => Number(form[k].value) || 0;
-    const nota = form.nota.value !== '' ? Math.min(10, Math.max(0, Number(form.nota.value)))
-      : calcularNota(n('aciertos'), n('fallos'), n('blanco'));
-    await guardar('tests', {
-      id: nuevoId(), fecha: form.fecha.value, tema: form.tema.value.trim(),
-      aciertos: n('aciertos'), fallos: n('fallos'), blanco: n('blanco'), nota, creado: new Date().toISOString(),
-    });
-    toast(`Test guardado: ${nota.toFixed(2)}`);
-    app.refrescar();
-  });
-
-  zona.querySelector('[data-acc=tema-grafica]')?.addEventListener('change', (e) => {
-    temaGrafica = e.target.value; app.refrescar();
-  });
-  zona.querySelectorAll('[data-borrar]').forEach((b) => b.addEventListener('click', async () => {
-    if (await confirmar('¿Borrar este test?', 'Borrar')) { await borrar('tests', b.dataset.borrar); app.refrescar(); }
-  }));
-  activarTooltip(zona);
 }
 
 /** Gráfica de líneas en SVG: nota (0–10) de cada test, una línea por tema. */
@@ -257,19 +179,32 @@ function barras(datosBarras, { linea = null, textoLinea = '', unidad = '' } = {}
   return `${svg}</svg><div class="tooltip" hidden></div>`;
 }
 
-// ---------------------------------------------------------------- TEMARIO
+// ---------------------------------------------------------------- TEMARIO Y NOTAS
 const ESTADOS = [
   ['pendiente', 'Pendiente'],
   ['estudiado', 'Estudiado'],
   ['repasado', 'Repasado'],
 ];
+const coma = (n) => n.toFixed(1).replace('.', ',');
+const claseNota = (n) => (n >= 7 ? 'bien' : n >= 5 ? 'regular' : 'mal');
+
+/** Chip con la última nota de un tema (y si sube o baja). */
+function chipNota(nombre) {
+  const r = resumenNotas(nombre);
+  if (!r) return '';
+  const flecha = r.tendencia === 'sube' ? ' ▲' : r.tendencia === 'baja' ? ' ▼' : '';
+  return `<span class="chip-nota ${claseNota(r.ultima)}" title="Última nota ${coma(r.ultima)} · media ${coma(r.media)} (${r.n} test${r.n > 1 ? 's' : ''})">${coma(r.ultima)}${flecha}</span>`;
+}
 
 function renderTemario(zona, app) {
-  const temas = [...datos.temas].sort((a, b) => a.orden - b.orden);
+  const temas = [...datos.temas].sort((a, b) => (a.orden || 0) - (b.orden || 0));
   const n = temas.length || 1;
   const est = temas.filter((t) => t.estado !== 'pendiente').length;
   const rep = temas.filter((t) => t.estado === 'repasado').length;
   const grupos = [...new Set(temas.map((t) => t.grupo))];
+  const flojos = temasFlojos();
+  const tests = [...datos.tests].sort((a, b) => b.fecha.localeCompare(a.fecha) || (b.creado || '').localeCompare(a.creado || ''));
+  const temasT = temasDeTests();
 
   zona.innerHTML = `
     <section class="tarjeta">
@@ -282,41 +217,196 @@ function renderTemario(zona, app) {
       <p class="leyenda"><span class="punto-leyenda repasado"></span> repasado
         <span class="punto-leyenda estudiado"></span> estudiado <span class="punto-leyenda pendiente"></span> pendiente</p>
     </section>
-    ${grupos.map((g) => `<section class="tarjeta"><h3>${esc(g)}</h3>
-      ${temas.filter((t) => t.grupo === g).map((t) => `
+
+    <div class="acciones-temario">
+      <label class="boton primario">📄 Añadir temas desde un PDF<input type="file" accept="application/pdf,.pdf" data-acc="pdf-indice" hidden></label>
+      <button class="boton" data-acc="nota">✍️ Apuntar nota de un test</button>
+      <button class="boton" data-acc="nuevo-tema">+ Tema</button>
+    </div>
+    <p class="ayuda">Los temas de las guías se añaden solos y su estado sube solo cuando haces sus tareas
+      (puedes cambiarlo tú). Toca un tema para ver sus notas. Con el PDF de un documento (PEIF, decretos, fichas…)
+      la app saca su índice para que elijas los apartados.</p>
+
+    ${flojos.length ? `<section class="tarjeta reforzar">
+      <h3>⚠️ Para reforzar</h3>
+      <p class="ayuda">Temas con la última nota por debajo de 5 o la media por debajo de 6.</p>
+      ${flojos.map((f) => `<div class="fila-flojo">
+        <span><b>${esc(f.nombre)}</b><small>última ${coma(f.ultima)} · media ${coma(f.media)} · ${f.n} test${f.n > 1 ? 's' : ''}</small></span>
+        <button class="boton pequeno" data-acc="reforzar" data-tema="${esc(f.nombre)}">➕ Repaso esta semana</button>
+      </div>`).join('')}
+    </section>` : ''}
+
+    ${grupos.map((g) => {
+      const delGrupo = temas.filter((t) => t.grupo === g);
+      const hechos = delGrupo.filter((t) => t.estado !== 'pendiente').length;
+      const notasMal = delGrupo.some((t) => { const r = resumenNotas(t.nombre); return r && (r.ultima < 5 || r.media < 6); });
+      return `<details class="tarjeta grupo-temario" data-grupo="${esc(g)}" ${gruposAbiertos.has(g) ? 'open' : ''}>
+      <summary><span class="grupo-nombre">${esc(g)}${notasMal ? ' <span class="chip-nota mal">⚠</span>' : ''}</span>
+        <span class="grupo-progreso"><b>${hechos}/${delGrupo.length}</b>
+          <span class="mini-barra"><i style="width:${(hechos / delGrupo.length) * 100}%"></i></span></span></summary>
+      ${delGrupo.map((t) => `
         <div class="fila-tema">
-          <span class="nombre-tema">${esc(t.nombre)}</span>
+          <button class="nombre-tema" data-acc="detalle" data-id="${t.id}">${esc(t.nombre)} ${chipNota(t.nombre)}</button>
           <div class="segmentado">
-            ${ESTADOS.map(([v, txt]) => `<button class="${t.estado === v ? 'activo ' + v : ''}" data-tema="${t.id}" data-estado="${v}">${txt}</button>`).join('')}
+            ${ESTADOS.map(([v, txt]) => `<button class="${t.estado === v ? 'activo ' + v : ''}" data-id="${t.id}" data-estado="${v}">${txt}</button>`).join('')}
           </div>
-          <button class="boton icono" data-borrar-tema="${t.id}" aria-label="Borrar tema">🗑</button>
-        </div>`).join('')}</section>`).join('')}
-    <button class="boton primario ancho" data-acc="nuevo-tema">+ Añadir tema</button>`;
+        </div>`).join('')}</details>`;
+    }).join('')}
+
+    <details class="tarjeta historial" ${tests.length ? '' : 'hidden'}>
+      <summary><b>📈 Historial de notas (${tests.length})</b></summary>
+      ${tests.length ? `
+        <select class="selector" data-acc="tema-grafica">
+          <option value="__todos">Todos los temas</option>
+          ${temasT.map((t) => `<option ${t === temaGrafica ? 'selected' : ''}>${esc(t)}</option>`).join('')}
+        </select>
+        <div class="grafica-envoltorio">${grafica(temasT)}</div>
+        <table class="tabla">
+          <thead><tr><th>Fecha</th><th>Tema</th><th>✓</th><th>✗</th><th>–</th><th>Nota</th><th></th></tr></thead>
+          <tbody>${tests.map((t) => `<tr>
+            <td>${textoCorto(t.fecha)}</td><td>${esc(t.tema)}</td><td>${t.aciertos}</td><td>${t.fallos}</td>
+            <td>${t.blanco}</td><td><b>${t.nota.toFixed(2)}</b></td>
+            <td><button class="boton icono" data-acc="borrar-test" data-id="${t.id}" aria-label="Borrar">🗑</button></td></tr>`).join('')}
+          </tbody></table>` : ''}
+    </details>`;
+
+  zona.querySelector('[data-acc=tema-grafica]')?.addEventListener('change', (e) => {
+    temaGrafica = e.target.value; app.refrescar();
+  });
+  zona.querySelector('[data-acc=pdf-indice]').addEventListener('change', async (e) => {
+    const f = e.target.files[0];
+    e.target.value = '';
+    if (f) { await temasDesdePDF(f); app.refrescar(); }
+  });
+  activarTooltip(zona);
+  zona.querySelectorAll('.grupo-temario').forEach((d) => d.addEventListener('toggle', () => {
+    if (d.open) gruposAbiertos.add(d.dataset.grupo); else gruposAbiertos.delete(d.dataset.grupo);
+  }));
 
   zona.onclick = async (e) => {
     const b = e.target.closest('button');
     if (!b) return;
-    if (b.dataset.tema) {
-      const t = datos.temas.find((x) => x.id === b.dataset.tema);
+    if (b.dataset.estado) {
+      const t = datos.temas.find((x) => x.id === b.dataset.id);
       await guardar('temas', { ...t, estado: b.dataset.estado });
       app.refrescar();
     }
-    if (b.dataset.borrarTema) {
-      const t = datos.temas.find((x) => x.id === b.dataset.borrarTema);
-      if (await confirmar(`¿Borrar el tema «${esc(t.nombre)}»?`, 'Borrar')) { await borrar('temas', t.id); app.refrescar(); }
+    const acc = b.dataset.acc;
+    if (acc === 'nota') { if (await dialogoNota()) app.refrescar(); }
+    if (acc === 'detalle') { await detalleTema(b.dataset.id); app.refrescar(); }
+    if (acc === 'reforzar') await reforzar(b.dataset.tema);
+    if (acc === 'borrar-test') {
+      if (await confirmar('¿Borrar esta nota?', 'Borrar')) { await borrar('tests', b.dataset.id); app.refrescar(); }
     }
-    if (b.dataset.acc === 'nuevo-tema') {
+    if (acc === 'nuevo-tema') {
       const r = await dialogo(`<h3>Nuevo tema</h3>
         <label class="campo"><span>Nombre</span><input name="nombre" placeholder="Ej: Ley de Montes"></label>
         <label class="campo"><span>Grupo</span><input name="grupo" list="lista-grupos" placeholder="Ej: Legislación"></label>
         <datalist id="lista-grupos">${grupos.map((g) => `<option value="${esc(g)}">`).join('')}</datalist>`,
       [{ texto: 'Cancelar', valor: false }, { texto: 'Añadir', valor: true, clase: 'primario' }],
-      (form, ok) => (ok ? { nombre: form.nombre.value.trim(), grupo: form.grupo.value.trim() || 'Otros' } : null));
+      (form, ok) => (ok ? { nombre: form.nombre.value.trim(), grupo: form.grupo.value.trim() } : null));
       if (r && r.nombre) {
-        const orden = Math.max(0, ...datos.temas.map((t) => t.orden)) + 1;
-        await guardar('temas', { id: nuevoId(), nombre: r.nombre, grupo: r.grupo, estado: 'pendiente', orden });
+        const orden = Math.max(0, ...datos.temas.map((t) => t.orden || 0)) + 1;
+        await guardar('temas', { id: nuevoId(), nombre: r.nombre, grupo: r.grupo || grupoPara(r.nombre), estado: 'pendiente', orden, origen: 'manual' });
         app.refrescar();
       }
     }
   };
+}
+
+/** Ficha de un tema: sus notas, sus tareas, cambiar nombre/grupo o borrarlo. */
+async function detalleTema(id) {
+  const t = datos.temas.find((x) => x.id === id);
+  if (!t) return;
+  const notas = notasDe(t.nombre);
+  const tareas = datos.tareas.filter((x) => normalizar(x.tema) === normalizar(t.nombre) && x.tipo !== 'clase');
+  const hechas = tareas.filter((x) => x.estado === 'hecha').length;
+  const r = resumenNotas(t.nombre);
+  const res = await dialogo(`
+    <h3>${esc(t.nombre)}</h3>
+    <div class="cifras">
+      <div class="cifra"><b>${r ? coma(r.ultima) : '—'}</b><small>última nota</small></div>
+      <div class="cifra"><b>${r ? coma(r.media) : '—'}</b><small>media (${notas.length} test${notas.length === 1 ? '' : 's'})</small></div>
+      <div class="cifra"><b>${hechas}/${tareas.length}</b><small>tareas de las guías</small></div>
+    </div>
+    ${notas.length ? `<div class="lista-notas">${notas.slice().reverse().map((x) =>
+      `<span class="chip-nota ${claseNota(x.nota)}">${textoCorto(x.fecha)} · ${coma(x.nota)}</span>`).join('')}</div>` : '<p class="ayuda">Aún no hay notas de este tema.</p>'}
+    <div class="dos-columnas">
+      <label class="campo"><span>Nombre</span><input name="nombre" value="${esc(t.nombre)}"></label>
+      <label class="campo"><span>Grupo</span><input name="grupo" value="${esc(t.grupo)}"></label>
+    </div>`,
+  [{ texto: '🗑 Borrar tema', valor: 'borrar', clase: 'peligro' }, { texto: '✍️ Apuntar nota', valor: 'nota' }, { texto: 'Guardar', valor: 'guardar', clase: 'primario' }],
+  (form, v) => ({ v, nombre: form.nombre.value.trim(), grupo: form.grupo.value.trim() }));
+  if (!res || !res.v) return;
+  if (res.v === 'borrar') {
+    if (await confirmar(`¿Borrar el tema «${esc(t.nombre)}» del temario? (Sus notas se conservan.)`, 'Borrar')) await borrar('temas', t.id);
+    return;
+  }
+  if (res.v === 'nota') { await dialogoNota({ tema: t.nombre }); return; }
+  if (res.nombre && (res.nombre !== t.nombre || res.grupo !== t.grupo)) {
+    // Si cambias el nombre, las notas antiguas pasan al nombre nuevo
+    if (res.nombre !== t.nombre) {
+      await guardar('tests', datos.tests.filter((x) => normalizar(x.tema) === normalizar(t.nombre)).map((x) => ({ ...x, tema: res.nombre })));
+    }
+    await guardar('temas', { ...t, nombre: res.nombre, grupo: res.grupo || t.grupo });
+  }
+}
+
+/** Añade un repaso del tema flojo a la semana actual. */
+async function reforzar(tema) {
+  const semana = semanaDe(hoyISO());
+  if (!semana) { avisar('Carga primero la guía de esta semana.'); return; }
+  const uid = `${semana.id}_refuerzo_${normalizar(tema).replace(/\s+/g, '-')}`;
+  if (datos.tareas.some((t) => t.uid === uid && t.estado !== 'hecha')) { toast('Ya tienes ese repaso esta semana'); return; }
+  const orden = Math.max(0, ...datos.tareas.filter((t) => t.semanaId === semana.id).map((t) => t.orden)) + 1;
+  await guardar('tareas', {
+    uid, semanaId: semana.id, id: `refuerzo_${orden}`, titulo: `Repaso ${tema} (reforzar)`, tema, tipo: 'repaso',
+    obligatoria: false, minimo: false, minutos: 30, dia_sugerido: null, dia_asignado: null, fijada: false,
+    estado: 'pendiente', hechaEn: null, minutosDedicados: 0, recolocadaDesde: null, orden, rescate: true,
+  });
+  const r = await repartirSemana(semana.id, [uid]);
+  toast(r.asignacion[uid] ? `Repaso añadido el ${textoCorto(r.asignacion[uid])} 📅` : 'Añadido, pero esta semana no queda hueco (mira «Sin hueco» en Semana)');
+}
+
+/** Lee el índice de un PDF y deja elegir qué apartados añadir al temario. */
+async function temasDesdePDF(archivo) {
+  toast('Leyendo el índice del PDF…');
+  let r;
+  try {
+    const { leerIndicePDF } = await import('../lector-pdf.js');
+    r = await leerIndicePDF(await archivo.arrayBuffer(), archivo.name);
+  } catch (err) {
+    await avisar(`No he podido abrir el PDF (${esc(err.message)}).`);
+    return;
+  }
+  if (!r.entradas.length) {
+    await avisar('No he encontrado un índice en este PDF (ni marcadores ni títulos numerados). Puedes añadir los temas a mano con «+ Tema».');
+    return;
+  }
+  const niveles1 = r.entradas.filter((e) => e.nivel === 1).length;
+  const marcarNivel = niveles1 >= 3 ? 1 : 2; // por defecto: los apartados principales
+  const res = await dialogo(`
+    <h3>📄 Índice encontrado</h3>
+    <p class="ayuda">${r.fuente === 'marcadores' ? 'Sacado de los marcadores del PDF.' : 'Sacado de los títulos numerados del documento.'}
+      Marca los apartados que quieras en tu temario.</p>
+    <label class="campo"><span>Grupo (nombre del documento)</span><input name="grupo" value="${esc(r.titulo)}"></label>
+    <div class="fila-botones"><button type="button" class="boton pequeno" data-marcar="todo">Marcar todo</button>
+      <button type="button" class="boton pequeno" data-marcar="nada">Ninguno</button></div>
+    <div class="vista-pdf indice">${r.entradas.map((e, i) => `
+      <label class="fila-indice nivel-${Math.min(e.nivel, 3)}">
+        <input type="checkbox" name="e${i}" ${e.nivel <= marcarNivel ? 'checked' : ''}>
+        <span>${esc(e.texto)}</span>
+      </label>`).join('')}</div>`,
+  [{ texto: 'Cancelar', valor: false }, { texto: 'Añadir al temario', valor: true, clase: 'primario' }],
+  (form, ok) => (ok ? { grupo: form.grupo.value.trim() || r.titulo || 'Documento', elegidas: r.entradas.filter((_, i) => form[`e${i}`].checked) } : null),
+  (d) => d.querySelectorAll('[data-marcar]').forEach((b) => b.addEventListener('click', () => {
+    d.querySelectorAll('.fila-indice input').forEach((c) => { c.checked = b.dataset.marcar === 'todo'; });
+  })));
+  if (!res || !res.elegidas.length) return;
+  const existentes = new Set(datos.temas.filter((t) => normalizar(t.grupo) === normalizar(res.grupo)).map((t) => normalizar(t.nombre)));
+  let orden = Math.max(0, ...datos.temas.map((t) => t.orden || 0)) + 1;
+  const nuevos = res.elegidas.filter((e) => !existentes.has(normalizar(e.texto)))
+    .map((e, i) => ({ id: nuevoId() + i, nombre: e.texto, grupo: res.grupo, estado: 'pendiente', orden: orden++, origen: 'pdf' }));
+  await guardar('temas', nuevos);
+  toast(`${nuevos.length} apartado(s) añadidos a «${res.grupo}»`);
 }

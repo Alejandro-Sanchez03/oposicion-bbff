@@ -31,6 +31,7 @@ trabajando a turnos. Se abre en **HOY** y te dice exactamente qué toca.
 | `js/bienvenida.js` | Asistente de la primera vez |
 | `js/resumen.js` | Resumen de la semana anterior y pasar pendientes |
 | `js/atrasado.js` + `js/pantallas/atrasado-vista.js` | Lo atrasado: marcar, recuperar (copias con `rescate`), consejo y recuperación automática |
+| `js/temario.js` + `js/notas.js` | Temario automático (temas de las guías, estado, notas por tema, temas flojos) y ventana para apuntar notas |
 | `js/sync.js` | Sincronización entre dispositivos con un gist privado de GitHub (gana el cambio más reciente) |
 | `fuentes/` | Tipografías incluidas (Bricolage Grotesque e Inter, licencia OFL) |
 | `js/pantallas/*.js` | Una archivo por pantalla: hoy, semana, calendario, progreso, ajustes |

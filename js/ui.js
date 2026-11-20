@@ -52,8 +52,9 @@ export function celebrar(origen = null) {
  * @param {Array} botones [{ texto, valor, clase }]
  * @returns {Promise} el `valor` del botón pulsado (o null si se cierra).
  * Si el contenido tiene campos con name, `alCerrar(form)` puede leerlos.
+ * `alAbrir(dialog)` se llama al abrirse (para añadir comportamiento, p. ej. cálculos en directo).
  */
-export function dialogo(html, botones = [{ texto: 'Vale', valor: true, clase: 'primario' }], alCerrar) {
+export function dialogo(html, botones = [{ texto: 'Vale', valor: true, clase: 'primario' }], alCerrar, alAbrir) {
   return new Promise((resolver) => {
     const d = document.createElement('dialog');
     d.innerHTML = `<form method="dialog" class="dialogo">
@@ -71,6 +72,7 @@ export function dialogo(html, botones = [{ texto: 'Vale', valor: true, clase: 'p
       resolver(extra !== undefined ? extra : valor);
     });
     d.showModal();
+    if (alAbrir) alAbrir(d);
     const primero = d.querySelector('input, textarea, select');
     if (primero) primero.focus();
   });

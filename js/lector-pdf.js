@@ -42,13 +42,17 @@ const sinTildes = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 // ---------- 1) Sacar el texto del PDF (con su posición en la página) ----------
 
-/** Devuelve una lista de trozos de texto: { p: página, x, y, w: ancho, s: texto }. */
-export async function leerTextoPDF(buffer) {
+async function abrirPDF(buffer) {
   const pdfjs = await import('../vendor/pdfjs/pdf.min.mjs');
   pdfjs.GlobalWorkerOptions.workerSrc = new URL('../vendor/pdfjs/pdf.worker.min.mjs', import.meta.url).href;
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(buffer), isEvalSupported: false, verbosity: 0 }).promise;
+  return pdfjs.getDocument({ data: new Uint8Array(buffer), isEvalSupported: false, verbosity: 0 }).promise;
+}
+
+/** Devuelve una lista de trozos de texto: { p: página, x, y, w: ancho, s: texto }. */
+export async function leerTextoPDF(buffer, maxPaginas = Infinity, docAbierto = null) {
+  const doc = docAbierto || await abrirPDF(buffer);
   const items = [];
-  for (let p = 1; p <= doc.numPages; p++) {
+  for (let p = 1; p <= Math.min(doc.numPages, maxPaginas); p++) {
     const contenido = await (await doc.getPage(p)).getTextContent();
     for (const it of contenido.items) {
       if (it.str && it.str.trim()) items.push({ p, x: it.transform[4], y: it.transform[5], w: it.width, s: it.str });
@@ -60,7 +64,7 @@ export async function leerTextoPDF(buffer) {
 // ---------- 2) Reconstruir líneas y palabras ----------
 
 /** Agrupa trozos en líneas (misma página y altura). Devuelve [{ p, y, palabras:[{s,x0,x1}], texto }]. */
-function lineas(items) {
+export function lineas(items) {
   const orden = [...items].sort((a, b) => a.p - b.p || b.y - a.y || a.x - b.x);
   const res = [];
   for (const it of orden) {
@@ -294,4 +298,71 @@ export function analizarGuia(items, hoy = aISO(new Date()), minutos = MINUTOS_PO
   };
   avisos.push('El PDF no dice cuánto dura cada tarea: he puesto minutos estimados. Revísalos antes de importar.');
   return { guia, avisos };
+}
+
+// =====================================================================
+// ÍNDICE DE UN DOCUMENTO (para el temario): PEIF, decretos, fichas...
+// =====================================================================
+
+/** Quita la "línea de puntos" y el número de página de una entrada de índice. */
+function limpiarEntrada(t) {
+  return t.replace(/[.·…_\s]{3,}\s*\d+\s*$/, '').replace(/\s+\d{1,3}$/, '').replace(/\s+/g, ' ').trim();
+}
+
+/** ¿Es un título numerado? Devuelve { nivel, texto } o null. */
+export function esTitulo(texto) {
+  const t = limpiarEntrada(texto);
+  if (t.length < 4 || t.length > 140) return null;
+  let m = /^(ANEXO|Anexo|CAP[IÍ]TULO|Cap[ií]tulo|T[IÍ]TULO|T[ií]tulo|DOCUMENTO|Documento|PARTE|Parte)\s+([IVXLC]+|\d+|[A-Z])\b\.?\s*[.:\-–—]?\s*(.*)$/.exec(t);
+  if (m) {
+    const tipo = m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase();
+    return { nivel: 1, texto: `${tipo} ${m[2]}${m[3] ? ` · ${m[3]}` : ''}` };
+  }
+  m = /^(Art[ií]culo|ART[IÍ]CULO)\s+(\d+)\.?\s*[.:\-–—]?\s*(.*)$/.exec(t);
+  if (m) return { nivel: 2, texto: `Artículo ${m[2]}${m[3] ? ` · ${m[3]}` : ''}` };
+  m = /^(\d{1,2}(?:\.\d{1,2}){0,3})\.?[\s)]+([A-ZÁÉÍÓÚÑ¿].{2,})$/.exec(t);
+  if (m) {
+    const nivel = m[1].split('.').filter(Boolean).length;
+    return { nivel, texto: `${m[1]}. ${m[2]}` };
+  }
+  return null;
+}
+
+/**
+ * Saca el índice de un PDF.
+ * 1) Si el PDF tiene marcadores (el índice lateral de los visores), usa esos.
+ * 2) Si no, busca títulos numerados en las primeras páginas (normalmente el índice).
+ * @returns {{ titulo: string, fuente: 'marcadores'|'texto', entradas: {nivel:number, texto:string}[] }}
+ */
+export async function leerIndicePDF(buffer, nombreArchivo = '') {
+  const doc = await abrirPDF(buffer);
+  let titulo = '';
+  try { titulo = (await doc.getMetadata())?.info?.Title || ''; } catch { /* sin metadatos */ }
+  if (!titulo || /^(microsoft|documento|untitled|sin t)/i.test(titulo)) {
+    titulo = nombreArchivo.replace(/\.pdf$/i, '').replace(/[_-]+/g, ' ').trim();
+  }
+  const entradas = [];
+  const outline = await doc.getOutline().catch(() => null);
+  if (outline && outline.length) {
+    const recorrer = (items, nivel) => {
+      for (const it of items) {
+        const texto = limpiarEntrada(it.title || '');
+        if (texto) entradas.push({ nivel, texto });
+        if (it.items?.length && nivel < 3) recorrer(it.items, nivel + 1);
+      }
+    };
+    recorrer(outline, 1);
+    return { titulo, fuente: 'marcadores', entradas };
+  }
+  // Sin marcadores: títulos numerados de las primeras 25 páginas
+  const vistos = new Set();
+  for (const l of lineas(await leerTextoPDF(null, 25, doc))) {
+    const r = esTitulo(l.texto);
+    if (!r) continue;
+    const clave = r.texto.toLowerCase();
+    if (vistos.has(clave)) continue;
+    vistos.add(clave);
+    entradas.push(r);
+  }
+  return { titulo, fuente: 'texto', entradas };
 }

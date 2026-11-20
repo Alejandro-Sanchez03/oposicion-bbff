@@ -23,6 +23,7 @@ export const AJUSTES_POR_DEFECTO = {
   fechaInicio: null,       // primer día que usaste la app (la racha empieza aquí)
   ultimaRevision: null,    // último día en que se recolocaron tareas atrasadas
   minutosPDF: null,        // minutos por tipo que usaste la última vez al importar un PDF
+  ultimasPreguntas: 50,    // nº de preguntas del último test apuntado
   recuperarAuto: false,    // ¿meter solo lo obligatorio atrasado en los huecos libres?
   fechaExamen: null,       // para la cuenta atrás ("Faltan X días")
   ultimaCopia: null,       // última copia de seguridad exportada (para recordártelo)
